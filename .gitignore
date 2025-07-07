@@ -1,0 +1,47 @@
+# Qt build artifacts
+build/
+*.user
+*.autosave
+*.pro.user*
+*.qmake.stash
+*.qmlproject.user*
+*.moc
+*.obj
+*.o
+*.a
+*.so
+*.so.*
+*.dll
+*.dylib
+*.exe
+*.app
+*.out
+*.log
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+*.cmake
+
+# Backup/Swap/Temp
+*~
+*.swp
+*.bak
+*.tmp
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.VC.db
+*.VC.opendb
