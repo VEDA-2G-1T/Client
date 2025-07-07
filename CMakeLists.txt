@@ -33,6 +33,7 @@ qt_add_executable(QtClientSSN
     ${SOURCES}
     ${HEADERS}
     ${FORMS}
+    cameralistdialog.h cameralistdialog.cpp
 )
 
 # ✅ Multimedia 링크 추가

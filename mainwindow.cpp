@@ -1,87 +1,47 @@
 #include "mainwindow.h"
-#include "cameraregistrationdialog.h"
+#include "cameralistdialog.h"
 #include "loghistorydialog.h"
-#include <QApplication>
+
+#include <QLabel>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <QGridLayout>
+#include <QScrollArea>
+#include <QTableWidget>
 #include <QHeaderView>
-#include <QDateTime>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), currentCameraNumber(1)
 {
     setupUI();
     setWindowTitle("Smart SafetyNet");
-    setMinimumSize(1000, 650);
+    setMinimumSize(1000, 700);
 
-    // ✅ 다크 테마 적용
     setStyleSheet(R"(
-        QWidget {
-            background-color: #2b2b2b;
-            color: white;
-        }
-        QLabel {
-            color: white;
-        }
-        QLineEdit {
-            background-color: #404040;
-            color: white;
-            border: 1px solid #555;
-            padding: 5px;
-            border-radius: 4px;
-        }
-        QComboBox {
-            background-color: #404040;
-            color: white;
-            border: 1px solid #555;
-            padding: 5px;
-            border-radius: 4px;
-        }
-        QTableWidget {
-            background-color: #404040;
-            color: white;
-            gridline-color: #555;
-            alternate-background-color: #353535;
-        }
-        QHeaderView::section {
-            background-color: #353535;
-            color: white;
-            font-weight: bold;
-            padding: 6px;
-            border: 1px solid #555;
-        }
+        QWidget { background-color: #2b2b2b; color: white; }
+        QLabel { color: white; }
+        QTableWidget { background-color: #404040; color: white; gridline-color: #555; }
+        QHeaderView::section { background-color: #353535; color: white; font-weight: bold; }
         QPushButton {
-            background-color: #404040;
-            color: white;
-            border: 1px solid #555;
-            padding: 6px 12px;
-            border-radius: 4px;
+            background-color: #404040; color: white;
+            border: 1px solid #555; padding: 6px; border-radius: 4px;
         }
-        QPushButton:hover {
-            background-color: #505050;
-        }
-        QCheckBox {
-            color: white;
-        }
+        QPushButton:hover { background-color: #505050; }
+        QCheckBox { color: white; }
     )");
-
-    registeredCameras << "Camera 1 (192.168.1.100)" << "Camera 2 (192.168.1.101)";
-    cameraSelectCombo->addItems(registeredCameras);
-
-    addLogEntry("Camera 1", "Motion detected");
-    addLogEntry("Camera 2", "PPE violation");
-    addLogEntry("Camera 1", "Normal operation");
 }
 
 MainWindow::~MainWindow() {}
 
+/*
 void MainWindow::setupUI()
 {
     centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
-    setMinimumSize(1100, 700);
 
-    // ✅ 최상단 인사 및 종료 버튼
+    // ✅ 최상단 인사말 + 종료 버튼
     QLabel *greetingLabel = new QLabel("Hello admin!");
-    greetingLabel->setStyleSheet("font-size: 20px; font-weight: bold; color: white;");
+    greetingLabel->setStyleSheet("font-size: 20px; font-weight: bold;");
 
     QPushButton *exitButton = new QPushButton("종료");
     connect(exitButton, &QPushButton::clicked, this, &MainWindow::close);
@@ -91,23 +51,53 @@ void MainWindow::setupUI()
     topLayout->addStretch();
     topLayout->addWidget(exitButton);
 
-    // ✅ 상단 레이블 (비디오 스트리밍 / 로그)
-    videoStreamingLabel = new QLabel("Video Streaming");
-    videoStreamingLabel->setStyleSheet("font-weight: bold; color: orange;");
-    QLabel *logLabel = new QLabel("Safety Alerts");
-    logLabel->setStyleSheet("font-weight: bold; color: orange;");
+    // ✅ Video Streaming 상단 라벨 + 버튼
+    QLabel *streamingLabel = new QLabel("Video Streaming");
+    streamingLabel->setStyleSheet("font-weight: bold; color: orange;");
 
-    QHBoxLayout *labelLayout = new QHBoxLayout();
-    labelLayout->addWidget(videoStreamingLabel, 2);
-    labelLayout->addWidget(logLabel, 1);
+    cameraListButton = new QPushButton("카메라 리스트");
+    connect(cameraListButton, &QPushButton::clicked, this, &MainWindow::onCameraListClicked);
 
-    // ✅ 비디오 스트리밍
-    videoWidget = new QVideoWidget();
-    mediaPlayer = new QMediaPlayer(this);
-    mediaPlayer->setVideoOutput(videoWidget);
-    videoWidget->setMinimumSize(640, 480);
+    QHBoxLayout *streamingHeaderLayout = new QHBoxLayout();
+    streamingHeaderLayout->addWidget(streamingLabel);
+    streamingHeaderLayout->addStretch();
+    streamingHeaderLayout->addWidget(cameraListButton);
 
-    // ✅ 로그 테이블
+    // ✅ Video Streaming Area
+    videoArea = new QWidget();
+    videoGridLayout = new QGridLayout(videoArea);
+    videoGridLayout->setContentsMargins(0, 0, 0, 0);
+    videoGridLayout->setHorizontalSpacing(1);
+    videoGridLayout->setVerticalSpacing(1);
+    videoGridLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+
+    scrollArea = new QScrollArea();
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setWidget(videoArea);
+    scrollArea->setFixedWidth(2 * 320 + 3);
+    scrollArea->setMinimumHeight(500);
+
+    QVBoxLayout *videoLayout = new QVBoxLayout();
+    videoLayout->addLayout(streamingHeaderLayout);
+    videoLayout->addWidget(scrollArea);
+
+    QWidget *videoSection = new QWidget();
+    videoSection->setLayout(videoLayout);
+    videoSection->setStyleSheet("border: 1px solid red;");
+
+    // ✅ Log 상단 라벨 + 버튼
+    QLabel *alertLabel = new QLabel("Alert");
+    alertLabel->setStyleSheet("font-weight: bold; color: orange;");
+
+    QPushButton *logHistoryButton = new QPushButton("전체 로그 보기");
+    connect(logHistoryButton, &QPushButton::clicked, this, &MainWindow::onLogHistoryClicked);
+
+    QHBoxLayout *logHeaderLayout = new QHBoxLayout();
+    logHeaderLayout->addWidget(alertLabel);
+    logHeaderLayout->addStretch();
+    logHeaderLayout->addWidget(logHistoryButton);
+
+    // ✅ Log Table
     logTable = new QTableWidget();
     logTable->setColumnCount(2);
     logTable->setHorizontalHeaderLabels({"Camera", "Alert"});
@@ -115,65 +105,252 @@ void MainWindow::setupUI()
     logTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     logTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     logTable->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    logTable->setShowGrid(true);
     logTable->verticalHeader()->setVisible(false);
 
-    QPushButton *logHistoryButton = new QPushButton("전체 로그 보기");
-    connect(logHistoryButton, &QPushButton::clicked, this, &MainWindow::onLogHistoryClicked);
-
     QVBoxLayout *logLayout = new QVBoxLayout();
+    logLayout->addLayout(logHeaderLayout);
     logLayout->addWidget(logTable);
-    logLayout->addWidget(logHistoryButton);
 
-    // ✅ 비디오 & 로그 수평 배치 (2:1)
-    mainLayout = new QHBoxLayout();  // ✅ 초기화 누락된 부분
-    mainLayout->addWidget(videoWidget);
-    mainLayout->addLayout(logLayout);
-    mainLayout->setStretch(0, 2);
-    mainLayout->setStretch(1, 1);
+    QWidget *logSection = new QWidget();
+    logSection->setLayout(logLayout);
+    logSection->setStyleSheet("border: 1px solid red;");
 
-    // ✅ 하단 제어 영역
-    cameraRegistrationButton = new QPushButton("카메라 등록");
-    connect(cameraRegistrationButton, &QPushButton::clicked, this, &MainWindow::onCameraRegistrationClicked);
+    // ✅ Function 상단 라벨
+    QLabel *functionLabel = new QLabel("Function");
+    functionLabel->setStyleSheet("font-weight: bold; color: orange;");
 
-    cameraSelectCombo = new QComboBox();
-
-    QHBoxLayout *cameraControlRow = new QHBoxLayout();
-    cameraControlRow->addWidget(cameraRegistrationButton);
-    cameraControlRow->addWidget(cameraSelectCombo);
-
-    QVBoxLayout *leftControlLayout = new QVBoxLayout();
-    leftControlLayout->addLayout(cameraControlRow);
-
-    // ✅ 체크박스 수직 정렬
     ppeDetectorCheckBox = new QCheckBox("PPE Detector");
     connect(ppeDetectorCheckBox, &QCheckBox::toggled, this, &MainWindow::onPPEDetectorToggled);
 
     mosaicerCheckBox = new QCheckBox("Mosaicer");
     connect(mosaicerCheckBox, &QCheckBox::toggled, this, &MainWindow::onMosaicerToggled);
 
-    QVBoxLayout *rightControlLayout = new QVBoxLayout();
-    rightControlLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-    rightControlLayout->addWidget(ppeDetectorCheckBox);
-    rightControlLayout->addWidget(mosaicerCheckBox);
+    QVBoxLayout *functionLayout = new QVBoxLayout();
+    functionLayout->addWidget(functionLabel);
+    functionLayout->addWidget(ppeDetectorCheckBox);
+    functionLayout->addWidget(mosaicerCheckBox);
+    functionLayout->addStretch();
 
-    QHBoxLayout *bottomLayout = new QHBoxLayout();
-    bottomLayout->addLayout(leftControlLayout);
-    bottomLayout->addLayout(rightControlLayout);
-    bottomLayout->setStretch(0, 2);
-    bottomLayout->setStretch(1, 1);
+    QWidget *functionSection = new QWidget();
+    functionSection->setLayout(functionLayout);
+    functionSection->setStyleSheet("border: 1px solid red;");
 
-    // ✅ 최종 전체 구성
-    outerLayout = new QVBoxLayout(centralWidget);
-    outerLayout->addLayout(topLayout);
-    outerLayout->addLayout(labelLayout);
-    outerLayout->addLayout(mainLayout);      // ✅ 누락되었던 mainLayout 포함
-    outerLayout->addSpacing(10);
-    outerLayout->addLayout(bottomLayout);
+    // ✅ 영상 + 로그 + 기능 수평 정렬
+    QHBoxLayout *mainBodyLayout = new QHBoxLayout();
+    mainBodyLayout->addWidget(videoSection);
+    mainBodyLayout->addWidget(logSection);
+    mainBodyLayout->addWidget(functionSection);
+
+    // ✅ 전체 수직 레이아웃
+    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+    mainLayout->addLayout(topLayout);
+    mainLayout->addLayout(mainBodyLayout);
+
+    refreshVideoGrid();
+}
+*/
+
+void MainWindow::setupUI()
+{
+    centralWidget = new QWidget(this);
+    setCentralWidget(centralWidget);
+
+    // ✅ 최상단 인사말 + 종료 버튼
+    QLabel *greetingLabel = new QLabel("Hello admin!");
+    greetingLabel->setStyleSheet("font-size: 20px; font-weight: bold;");
+
+    QPushButton *exitButton = new QPushButton("종료");
+    connect(exitButton, &QPushButton::clicked, this, &MainWindow::close);
+
+    QHBoxLayout *topLayout = new QHBoxLayout();
+    topLayout->addWidget(greetingLabel);
+    topLayout->addStretch();
+    topLayout->addWidget(exitButton);
+
+    // ✅ Video Streaming 상단 라벨 + 버튼
+    QLabel *streamingLabel = new QLabel("Video Streaming");
+    streamingLabel->setStyleSheet("font-weight: bold; color: orange;");
+
+    cameraListButton = new QPushButton("카메라 리스트");
+    connect(cameraListButton, &QPushButton::clicked, this, &MainWindow::onCameraListClicked);
+
+    QHBoxLayout *streamingHeaderLayout = new QHBoxLayout();
+    streamingHeaderLayout->addWidget(streamingLabel);
+    streamingHeaderLayout->addStretch();
+    streamingHeaderLayout->addWidget(cameraListButton);
+
+    // ✅ Video Streaming Area
+    videoArea = new QWidget();
+    videoGridLayout = new QGridLayout(videoArea);
+    videoGridLayout->setContentsMargins(0, 0, 0, 0);
+    videoGridLayout->setHorizontalSpacing(1);
+    videoGridLayout->setVerticalSpacing(1);
+    videoGridLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+
+    scrollArea = new QScrollArea();
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setWidget(videoArea);
+    scrollArea->setFixedWidth(2 * 320 + 3);
+    scrollArea->setMinimumHeight(500);
+
+    QVBoxLayout *videoLayout = new QVBoxLayout();
+    videoLayout->addLayout(streamingHeaderLayout);
+    videoLayout->addWidget(scrollArea);
+
+    QWidget *videoSection = new QWidget();
+    videoSection->setLayout(videoLayout);
+    videoSection->setFixedWidth(640);
+    videoSection->setStyleSheet("border: 1px solid red;");
+
+    // ✅ Log 상단 라벨 + 버튼
+    QLabel *alertLabel = new QLabel("Alert");
+    alertLabel->setStyleSheet("font-weight: bold; color: orange;");
+
+    QPushButton *logHistoryButton = new QPushButton("전체 로그 보기");
+    connect(logHistoryButton, &QPushButton::clicked, this, &MainWindow::onLogHistoryClicked);
+
+    QHBoxLayout *logHeaderLayout = new QHBoxLayout();
+    logHeaderLayout->addWidget(alertLabel);
+    logHeaderLayout->addStretch();
+    logHeaderLayout->addWidget(logHistoryButton);
+
+    // ✅ Log Table
+    logTable = new QTableWidget();
+    logTable->setColumnCount(2);
+    logTable->setHorizontalHeaderLabels({"Camera", "Alert"});
+    logTable->horizontalHeader()->setStretchLastSection(true);
+    logTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    logTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    logTable->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    logTable->verticalHeader()->setVisible(false);
+
+    QVBoxLayout *logLayout = new QVBoxLayout();
+    logLayout->addLayout(logHeaderLayout);
+    logLayout->addWidget(logTable);
+
+    QWidget *logSection = new QWidget();
+    logSection->setLayout(logLayout);
+    logSection->setStyleSheet("border: 1px solid red;");
+
+    // ✅ Function 상단 라벨 → 버튼처럼 안보이게 처리
+    QPushButton *functionLabelButton = new QPushButton("Function");
+    functionLabelButton->setFlat(true);
+    functionLabelButton->setStyleSheet(R"(
+        QPushButton {
+            background-color: transparent;
+            color: orange;
+            font-weight: bold;
+            border: none;
+        }
+        QPushButton:hover {
+            color: #ffae42;
+            text-decoration: underline;
+        }
+    )");
+
+    ppeDetectorCheckBox = new QCheckBox("PPE Detector");
+    connect(ppeDetectorCheckBox, &QCheckBox::toggled, this, &MainWindow::onPPEDetectorToggled);
+
+    mosaicerCheckBox = new QCheckBox("Mosaicer");
+    connect(mosaicerCheckBox, &QCheckBox::toggled, this, &MainWindow::onMosaicerToggled);
+
+    QVBoxLayout *functionLayout = new QVBoxLayout();
+    functionLayout->addWidget(functionLabelButton);
+    functionLayout->addWidget(ppeDetectorCheckBox);
+    functionLayout->addWidget(mosaicerCheckBox);
+    functionLayout->addStretch();
+
+    QWidget *functionSection = new QWidget();
+    functionSection->setLayout(functionLayout);
+    functionSection->setFixedWidth(200);  // ← 원하는 만큼 px 단위로 조정
+    functionSection->setStyleSheet("border: 1px solid red;");
+
+    // ✅ 영상 + 로그 + 기능 수평 정렬
+    QHBoxLayout *mainBodyLayout = new QHBoxLayout();
+    mainBodyLayout->addWidget(videoSection);
+    mainBodyLayout->addWidget(logSection);
+    mainBodyLayout->addWidget(functionSection);
+
+    // ✅ 전체 수직 레이아웃
+    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+    mainLayout->addLayout(topLayout);
+    mainLayout->addLayout(mainBodyLayout);
+
+    refreshVideoGrid();
 }
 
-void MainWindow::setupVideoStreamingSection() {}
-void MainWindow::setupLogSection() {}
+
+void MainWindow::onCameraListClicked()
+{
+    if (!cameraListDialog) {
+        cameraListDialog = new CameraListDialog(this, &cameraList);
+        connect(cameraListDialog, &CameraListDialog::cameraListUpdated, this, &MainWindow::refreshVideoGrid);
+    }
+
+    cameraListDialog->refreshTable();  // ✅ 항상 최신 정보로 갱신
+    cameraListDialog->show();
+    cameraListDialog->raise();
+    cameraListDialog->activateWindow();
+}
+
+
+void MainWindow::refreshVideoGrid()
+{
+    QLayoutItem *child;
+    while ((child = videoGridLayout->takeAt(0)) != nullptr) {
+        if (child->widget()) {
+            child->widget()->deleteLater();
+        }
+        delete child;
+    }
+
+    for (QMediaPlayer *player : players) {
+        player->stop();
+        delete player;
+    }
+    players.clear();
+    videoWidgets.clear();
+
+    int total = std::max(4, static_cast<int>(cameraList.size()));
+    int columns = 2;
+    int rows = (total + 1) / 2;
+
+    // ✅ videoArea 크기 강제 지정 (스크롤바 방지)
+    videoArea->setMinimumSize(columns * 320, rows * 240);
+
+    for (int i = 0; i < total; ++i) {
+        QWidget *videoFrame = new QWidget();
+        videoFrame->setFixedSize(320, 240);
+        videoFrame->setStyleSheet("background-color: black; border: 1px solid #555;");
+
+        if (i < cameraList.size()) {
+            QLabel *nameLabel = new QLabel(cameraList[i].name, videoFrame);
+            nameLabel->setStyleSheet("color: white; font-weight: bold; background-color: rgba(0,0,0,100); padding: 2px;");
+            nameLabel->move(5, 5);
+            nameLabel->show();
+
+            QVideoWidget *vw = new QVideoWidget(videoFrame);
+            vw->setGeometry(0, 0, 320, 240);
+            vw->lower();
+
+            QMediaPlayer *player = new QMediaPlayer(this);
+            player->setVideoOutput(vw);
+            player->setSource(QUrl(cameraList[i].rtspUrl()));
+            player->play();
+
+            players.append(player);
+            videoWidgets.append(vw);
+        } else {
+            QLabel *noCam = new QLabel("No Camera", videoFrame);
+            noCam->setAlignment(Qt::AlignCenter);
+            noCam->setGeometry(0, 0, 320, 240);
+            noCam->setStyleSheet("color: white;");
+        }
+
+        videoGridLayout->addWidget(videoFrame, i / columns, i % columns);
+    }
+}
+
 
 void MainWindow::addLogEntry(const QString &camera, const QString &alert)
 {
@@ -181,38 +358,8 @@ void MainWindow::addLogEntry(const QString &camera, const QString &alert)
     logTable->setItem(0, 0, new QTableWidgetItem(camera));
     logTable->setItem(0, 1, new QTableWidgetItem(alert));
 
-    const int maxRows = 20;
-    if (logTable->rowCount() > maxRows) {
+    if (logTable->rowCount() > 20)
         logTable->removeRow(logTable->rowCount() - 1);
-    }
-}
-
-void MainWindow::onCameraRegistrationClicked()
-{
-    CameraRegistrationDialog dialog(this);
-    if (dialog.exec() == QDialog::Accepted) {
-        QString cameraInfo = dialog.getCameraInfo();
-        registeredCameras.append(cameraInfo);
-        cameraSelectCombo->addItem(cameraInfo);
-        addLogEntry("System", "New camera registered: " + cameraInfo);
-    }
-}
-
-void MainWindow::onCameraSelectChanged(const QString &cameraName)
-{
-    if (cameraName != "Camera Select" && !cameraName.isEmpty()) {
-        int cameraIndex = registeredCameras.indexOf(cameraName) + 1;
-        currentCameraNumber = cameraIndex;
-        cameraNumberLabel->setText(QString("Camera #%1").arg(currentCameraNumber));
-        addLogEntry("System", QString("Switched to %1").arg(cameraName));
-
-        if (cameraName.contains("192.168.1.100"))
-            mediaPlayer->setSource(QUrl("rtsp://192.168.1.100/stream"));
-        else if (cameraName.contains("192.168.1.101"))
-            mediaPlayer->setSource(QUrl("rtsp://192.168.1.101/stream"));
-
-        mediaPlayer->play();
-    }
 }
 
 void MainWindow::onLogHistoryClicked()
@@ -221,20 +368,16 @@ void MainWindow::onLogHistoryClicked()
     dialog.exec();
 }
 
-void MainWindow::onMosaicerToggled(bool enabled)
-{
-    if (enabled && ppeDetectorCheckBox->isChecked()) {
-        ppeDetectorCheckBox->setChecked(false);
-    }
-    QString status = enabled ? "enabled" : "disabled";
-    addLogEntry("System", QString("Mosaicer %1").arg(status));
-}
-
 void MainWindow::onPPEDetectorToggled(bool enabled)
 {
-    if (enabled && mosaicerCheckBox->isChecked()) {
+    if (enabled && mosaicerCheckBox->isChecked())
         mosaicerCheckBox->setChecked(false);
-    }
-    QString status = enabled ? "enabled" : "disabled";
-    addLogEntry("System", QString("PPE Detector %1").arg(status));
+    addLogEntry("System", QString("PPE Detector %1").arg(enabled ? "enabled" : "disabled"));
+}
+
+void MainWindow::onMosaicerToggled(bool enabled)
+{
+    if (enabled && ppeDetectorCheckBox->isChecked())
+        ppeDetectorCheckBox->setChecked(false);
+    addLogEntry("System", QString("Mosaicer %1").arg(enabled ? "enabled" : "disabled"));
 }

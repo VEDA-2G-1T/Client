@@ -4,10 +4,6 @@
 #include <QDialog>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QMessageBox>
 
 class CameraRegistrationDialog : public QDialog
 {
@@ -15,7 +11,11 @@ class CameraRegistrationDialog : public QDialog
 
 public:
     explicit CameraRegistrationDialog(QWidget *parent = nullptr);
-    QString getCameraInfo() const;
+
+    QString getCameraName() const;
+    QString getCameraIP() const;
+    QString getCameraPort() const;
+    QString getStreamId() const;
 
 private slots:
     void onOkClicked();
@@ -24,13 +24,13 @@ private slots:
 private:
     void setupUI();
 
-    QLineEdit *cameraNameEdit;
-    QLineEdit *cameraIpEdit;
-    QLineEdit *cameraPortEdit;
+    QLineEdit *nameEdit;
+    QLineEdit *ipEdit;
+    QLineEdit *portEdit;
+    QLineEdit *streamIdEdit;
+
     QPushButton *okButton;
     QPushButton *cancelButton;
-
-    QString cameraInfo;
 };
 
 #endif // CAMERAREGISTRATIONDIALOG_H
