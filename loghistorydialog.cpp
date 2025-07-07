@@ -25,6 +25,9 @@ void LogHistoryDialog::setupUI()
     historyTable->horizontalHeader()->setStretchLastSection(true);
     historyTable->setAlternatingRowColors(true);
 
+    // ✅ 행 번호 헤더 숨기기
+    historyTable->verticalHeader()->setVisible(false);
+
     // Close button
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     closeButton = new QPushButton("Close");
@@ -58,6 +61,12 @@ void LogHistoryDialog::setupUI()
         QTableWidget::item {
             padding: 8px;
         }
+
+        QTableWidget::item:focus {
+            outline: none;     // ✅ 하얀 테두리 제거
+            border: none;
+        }
+
         QHeaderView::section {
             background-color: #353535;
             color: white;

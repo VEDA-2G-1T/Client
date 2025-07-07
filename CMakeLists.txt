@@ -26,7 +26,7 @@ set(HEADERS
 )
 
 set(FORMS
-    mainwindow.ui
+
 )
 
 qt_add_executable(QtClientSSN

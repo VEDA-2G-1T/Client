@@ -708,20 +708,20 @@ QtClientSSN_autogen/timestamp: \
 	C:/Qt/Tools/mingw1310_64/x86_64-w64-mingw32/include/time.h \
 	C:/Qt/Tools/mingw1310_64/x86_64-w64-mingw32/include/vadefs.h \
 	C:/Qt/Tools/mingw1310_64/x86_64-w64-mingw32/include/wchar.h \
-	C:/Users/gs01l/Documents/QtSSN/CMakeLists.txt \
-	C:/Users/gs01l/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qtc/package-manager/auto-setup.cmake \
-	C:/Users/gs01l/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qtc/package-manager/maintenance_tool_provider.cmake \
-	C:/Users/gs01l/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/CMakeFiles/3.30.5/CMakeCXXCompiler.cmake \
-	C:/Users/gs01l/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/CMakeFiles/3.30.5/CMakeRCCompiler.cmake \
-	C:/Users/gs01l/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/CMakeFiles/3.30.5/CMakeSystem.cmake \
-	C:/Users/gs01l/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/QtClientSSN_autogen/moc_predefs.h \
-	C:/Users/gs01l/Documents/QtSSN/cameraregistrationdialog.cpp \
-	C:/Users/gs01l/Documents/QtSSN/cameraregistrationdialog.h \
-	C:/Users/gs01l/Documents/QtSSN/loghistorydialog.cpp \
-	C:/Users/gs01l/Documents/QtSSN/loghistorydialog.h \
-	C:/Users/gs01l/Documents/QtSSN/loginwindow.cpp \
-	C:/Users/gs01l/Documents/QtSSN/loginwindow.h \
-	C:/Users/gs01l/Documents/QtSSN/main.cpp \
-	C:/Users/gs01l/Documents/QtSSN/mainwindow.cpp \
-	C:/Users/gs01l/Documents/QtSSN/mainwindow.h \
+	C:/Users/2-11/Documents/QtSSN/CMakeLists.txt \
+	C:/Users/2-11/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qtc/package-manager/auto-setup.cmake \
+	C:/Users/2-11/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/.qtc/package-manager/maintenance_tool_provider.cmake \
+	C:/Users/2-11/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/CMakeFiles/3.30.5/CMakeCXXCompiler.cmake \
+	C:/Users/2-11/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/CMakeFiles/3.30.5/CMakeRCCompiler.cmake \
+	C:/Users/2-11/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/CMakeFiles/3.30.5/CMakeSystem.cmake \
+	C:/Users/2-11/Documents/QtSSN/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug/QtClientSSN_autogen/moc_predefs.h \
+	C:/Users/2-11/Documents/QtSSN/cameraregistrationdialog.cpp \
+	C:/Users/2-11/Documents/QtSSN/cameraregistrationdialog.h \
+	C:/Users/2-11/Documents/QtSSN/loghistorydialog.cpp \
+	C:/Users/2-11/Documents/QtSSN/loghistorydialog.h \
+	C:/Users/2-11/Documents/QtSSN/loginwindow.cpp \
+	C:/Users/2-11/Documents/QtSSN/loginwindow.h \
+	C:/Users/2-11/Documents/QtSSN/main.cpp \
+	C:/Users/2-11/Documents/QtSSN/mainwindow.cpp \
+	C:/Users/2-11/Documents/QtSSN/mainwindow.h \
 	C:/Qt/Tools/CMake_64/bin/cmake.exe
