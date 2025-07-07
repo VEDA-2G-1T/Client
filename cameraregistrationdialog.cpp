@@ -1,67 +1,118 @@
 #include "cameraregistrationdialog.h"
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
+#include <QMessageBox>
 
 CameraRegistrationDialog::CameraRegistrationDialog(QWidget *parent)
     : QDialog(parent)
 {
     setupUI();
-    setWindowTitle("Camera Registration");
-    setFixedSize(300, 200);
+    setWindowTitle("카메라 등록");
+    setFixedSize(360, 250);
     setModal(true);
+
+    setStyleSheet(R"(
+        QDialog {
+            background-color: #2b2b2b;
+            color: white;
+        }
+        QLabel {
+            color: white;
+        }
+        QLineEdit {
+            background-color: #404040;
+            color: white;
+            border: 1px solid #555;
+            padding: 1px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        QPushButton {
+            font-size: 10px;
+            background-color: #404040;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+        }
+        QPushButton:hover {
+            background-color: #505050;
+        }
+    )");
 }
 
 void CameraRegistrationDialog::setupUI()
 {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
-    // Camera name
-    QLabel *nameLabel = new QLabel("Camera Name:");
-    cameraNameEdit = new QLineEdit();
-    cameraNameEdit->setPlaceholderText("e.g., Front Door Camera");
+    // 카메라 이름
+    QLabel *nameLabel = new QLabel("카메라 이름:");
+    nameEdit = new QLineEdit();
+    nameEdit->setPlaceholderText("예: 작업장 #");
 
-    // Camera IP
-    QLabel *ipLabel = new QLabel("Camera IP:");
-    cameraIpEdit = new QLineEdit();
-    cameraIpEdit->setPlaceholderText("e.g., 192.168.1.100");
+    // 카메라 IP
+    QLabel *ipLabel = new QLabel("카메라 IP:");
+    ipEdit = new QLineEdit();
+    ipEdit->setPlaceholderText("예: 192.168.0.66");
 
-    // IP validation (정규표현식)
-    QRegularExpression ipRegex("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
-    QRegularExpressionValidator *ipValidator = new QRegularExpressionValidator(ipRegex, this);
-    cameraIpEdit->setValidator(ipValidator);
+    // 정규식 유효성 검사기
+    QRegularExpression ipRegex("^(?:(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$");
+    QValidator *ipValidator = new QRegularExpressionValidator(ipRegex, this);
+    ipEdit->setValidator(ipValidator);
 
-    // Camera Port (optional)
-    QLabel *portLabel = new QLabel("Port (optional):");
-    cameraPortEdit = new QLineEdit();
-    cameraPortEdit->setPlaceholderText("e.g., 8080");
+    // 포트 번호
+    QLabel *portLabel = new QLabel("포트번호:");
+    portEdit = new QLineEdit();
+    portEdit->setPlaceholderText("예: 8554");
 
-    // Buttons
-    QHBoxLayout *buttonLayout = new QHBoxLayout();
-    okButton = new QPushButton("OK");
-    cancelButton = new QPushButton("Cancel");
+    // 스트림 식별자
+    QLabel *streamLabel = new QLabel("스트림 식별자:");
+    streamIdEdit = new QLineEdit();
+    streamIdEdit->setPlaceholderText("예: mooostream");
 
-    // ✅ 버튼 최소 너비 설정
-    okButton->setMinimumWidth(80);
-    cancelButton->setMinimumWidth(80);
+    // 버튼 생성
+    okButton = new QPushButton("등록");
+    cancelButton = new QPushButton("취소");
 
-    buttonLayout->addStretch();
-    buttonLayout->addWidget(okButton);
-    buttonLayout->addWidget(cancelButton);
+    // ✅ 버튼 글자 안 잘리게 폭 고정
+    okButton->setFixedHeight(30);
+    cancelButton->setFixedHeight(30);
 
-    // Layout 구성
+    // ✅ 버튼 폰트/패딩 스타일
+
+    QString buttonStyle = R"(
+        QPushButton {
+            font-size: 12px;
+        }
+    )";
+    okButton->setStyleSheet(buttonStyle);
+    cancelButton->setStyleSheet(buttonStyle);
+
+    // 버튼 레이아웃
+    QHBoxLayout *btnLayout = new QHBoxLayout();
+    btnLayout->addStretch();
+    btnLayout->addWidget(okButton);
+    btnLayout->addWidget(cancelButton);
+
+    // 메인 레이아웃 구성
     mainLayout->addWidget(nameLabel);
-    mainLayout->addWidget(cameraNameEdit);
+    mainLayout->addWidget(nameEdit);
     mainLayout->addWidget(ipLabel);
-    mainLayout->addWidget(cameraIpEdit);
+    mainLayout->addWidget(ipEdit);
     mainLayout->addWidget(portLabel);
-    mainLayout->addWidget(cameraPortEdit);
-    mainLayout->addLayout(buttonLayout);
+    mainLayout->addWidget(portEdit);
+    mainLayout->addWidget(streamLabel);
+    mainLayout->addWidget(streamIdEdit);
+    mainLayout->addLayout(btnLayout);
 
-    // Signal 연결
-    connect(okButton, &QPushButton::clicked, this, &CameraRegistrationDialog::onOkClicked);
-    connect(cancelButton, &QPushButton::clicked, this, &CameraRegistrationDialog::onCancelClicked);
+    // ✅ 다이얼로그 크기 확장 (진짜 중요!)
+    setFixedSize(420, 300);
+    setModal(true);
+    setWindowTitle("카메라 등록");
 
-    // 다크 테마 스타일 적용 (min-width 제거됨)
+    // ✅ 스타일 적용
     setStyleSheet(R"(
         QDialog {
             background-color: #2b2b2b;
@@ -76,42 +127,26 @@ void CameraRegistrationDialog::setupUI()
             border: 1px solid #555;
             padding: 5px;
             border-radius: 4px;
-        }
-        QPushButton {
-            background-color: #404040;
-            color: white;
-            border: 1px solid #555;
-            padding: 8px 16px;  // ✅ 글자 여유 확보
-            border-radius: 4px;
+            font-size: 13px;
         }
         QPushButton:hover {
             background-color: #505050;
         }
     )");
+
+    connect(okButton, &QPushButton::clicked, this, &CameraRegistrationDialog::onOkClicked);
+    connect(cancelButton, &QPushButton::clicked, this, &CameraRegistrationDialog::onCancelClicked);
 }
 
-
-QString CameraRegistrationDialog::getCameraInfo() const
-{
-    return cameraInfo;
-}
 
 void CameraRegistrationDialog::onOkClicked()
 {
-    QString name = cameraNameEdit->text().trimmed();
-    QString ip = cameraIpEdit->text().trimmed();
-    QString port = cameraPortEdit->text().trimmed();
-
-    if (name.isEmpty() || ip.isEmpty()) {
-        QMessageBox::warning(this, "Invalid Input", "Please enter both camera name and IP address.");
+    if (nameEdit->text().trimmed().isEmpty() ||
+        ipEdit->text().trimmed().isEmpty() ||
+        portEdit->text().trimmed().isEmpty() ||
+        streamIdEdit->text().trimmed().isEmpty()) {
+        QMessageBox::warning(this, "입력 오류", "모든 항목을 입력해주세요.");
         return;
-    }
-
-    // Create camera info string
-    if (port.isEmpty()) {
-        cameraInfo = QString("%1 (%2)").arg(name, ip);
-    } else {
-        cameraInfo = QString("%1 (%2:%3)").arg(name, ip, port);
     }
 
     accept();
@@ -121,3 +156,9 @@ void CameraRegistrationDialog::onCancelClicked()
 {
     reject();
 }
+
+// Getters
+QString CameraRegistrationDialog::getCameraName() const { return nameEdit->text().trimmed(); }
+QString CameraRegistrationDialog::getCameraIP() const { return ipEdit->text().trimmed(); }
+QString CameraRegistrationDialog::getCameraPort() const { return portEdit->text().trimmed(); }
+QString CameraRegistrationDialog::getStreamId() const { return streamIdEdit->text().trimmed(); }

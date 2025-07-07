@@ -2,19 +2,31 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QVector>
+#include <QString>
 #include <QWidget>
-#include <QHBoxLayout>
 #include <QVBoxLayout>
-#include <QLabel>
+#include <QGridLayout>
+#include <QScrollArea>
 #include <QPushButton>
-#include <QComboBox>
-#include <QTableWidget>
+#include <QLabel>
 #include <QCheckBox>
+#include <QTableWidget>
 #include <QMediaPlayer>
 #include <QVideoWidget>
 
-class CameraRegistrationDialog;
-class LogHistoryDialog;
+class CameraListDialog;
+
+struct CameraInfo {
+    QString name;
+    QString ip;
+    QString port;
+    QString streamId;
+
+    QString rtspUrl() const {
+        return QString("rtsp://%1:%2/%3").arg(ip, port, streamId);
+    }
+};
 
 class MainWindow : public QMainWindow
 {
@@ -24,46 +36,37 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+    void refreshVideoGrid();  // 외부에서 카메라 갱신 시 호출
+
 private slots:
-    void onCameraRegistrationClicked();
-    void onCameraSelectChanged(const QString &cameraName);
+    void onCameraListClicked();
     void onLogHistoryClicked();
-    void onMosaicerToggled(bool enabled);
     void onPPEDetectorToggled(bool enabled);
+    void onMosaicerToggled(bool enabled);
 
 private:
     void setupUI();
-    void setupVideoStreamingSection();
-    void setupLogSection();
     void addLogEntry(const QString &camera, const QString &alert);
 
-    // UI Layouts
-    QWidget *centralWidget;
-    QVBoxLayout *outerLayout;        // ✅ 추가
-    QHBoxLayout *mainLayout;
+    // 📷 카메라 관련
+    QVector<CameraInfo> cameraList;
+    QVector<QMediaPlayer*> players;
+    QVector<QVideoWidget*> videoWidgets;
 
-    // Video Streaming Section
-    QWidget *videoSection;
-    QLabel *videoStreamingLabel;
-    QLabel *cameraNumberLabel;
-    QMediaPlayer *mediaPlayer;
-    QVideoWidget *videoWidget;
+    // 🖥️ UI 요소
+    QWidget* centralWidget;
+    QWidget* videoArea;                // ✅ 영상 그리드 컨테이너
+    QGridLayout* videoGridLayout;
+    QScrollArea* scrollArea;
+    QTableWidget* logTable;
 
-    // Log Section
-    QWidget *logSection;
-    QLabel *logLabel;
-    QPushButton *logHistoryButton;
-    QTableWidget *logTable;
+    QPushButton* cameraListButton;
+    QCheckBox* ppeDetectorCheckBox;
+    QCheckBox* mosaicerCheckBox;
 
-    // Controls (Bottom)
-    QPushButton *cameraRegistrationButton;
-    QComboBox *cameraSelectCombo;
-    QCheckBox *mosaicerCheckBox;
-    QCheckBox *ppeDetectorCheckBox;
-
-    // Data
-    QStringList registeredCameras;
+    // 기타
     int currentCameraNumber;
+    CameraListDialog* cameraListDialog = nullptr;
 };
 
 #endif // MAINWINDOW_H
