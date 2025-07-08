@@ -57,9 +57,12 @@ private:
     QTableWidget *logTable;
 
     QPushButton *cameraListButton;
+
     QCheckBox *rawCheckBox;
     QCheckBox *blurCheckBox;
     QCheckBox *ppeDetectorCheckBox;
+
+    void switchStreamForAllPlayers(const QString &suffix);
 
     CameraListDialog *cameraListDialog = nullptr;
     QNetworkAccessManager *networkManager;
