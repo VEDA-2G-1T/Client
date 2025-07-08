@@ -27,6 +27,12 @@ struct CameraInfo {
     }
 };
 
+struct LogEntry {
+    QString camera;
+    QString alert;
+    QString imagePath;
+};
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -42,15 +48,16 @@ private slots:
     void onLogHistoryClicked();
     void sendModeChangeRequest(const QString &mode, const CameraInfo &camera);
     void pollLogsFromServer();
+    void onAlertItemClicked(int row, int column);  // ✅ 새로 추가
 
 private:
     void setupUI();
-    void addLogEntry(const QString &camera, const QString &alert);
+    void addLogEntry(const QString &camera, const QString &alert, const QString &imagePath);
 
     QVector<CameraInfo> cameraList;
     QVector<QMediaPlayer*> players;
     QVector<QVideoWidget*> videoWidgets;
-    QVector<QPair<QString, QString>> fullLogEntries; // (Camera, Alert)
+    QVector<LogEntry> fullLogEntries;
 
     QWidget *centralWidget;
     QWidget *videoArea;

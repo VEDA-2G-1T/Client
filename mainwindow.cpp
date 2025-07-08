@@ -116,6 +116,8 @@ void MainWindow::setupUI()
     logTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     logTable->verticalHeader()->setVisible(false);
 
+    connect(logTable, &QTableWidget::cellClicked, this, &MainWindow::onAlertItemClicked);
+
     QVBoxLayout *logLayout = new QVBoxLayout();
     logLayout->addLayout(logHeaderLayout);
     logLayout->addWidget(logTable);
@@ -148,7 +150,7 @@ void MainWindow::setupUI()
             blurCheckBox->setChecked(false);
             ppeDetectorCheckBox->setChecked(false);
             switchStreamForAllPlayers("raw");  // ✅ 여기서 raw 스트림 전환
-            addLogEntry("System", "Raw mode enabled");
+            addLogEntry("System", "Raw mode enabled", "");
         }
     });
 
@@ -160,7 +162,7 @@ void MainWindow::setupUI()
                 sendModeChangeRequest("blur", cameraList.first());
             }
             switchStreamForAllPlayers("processed");  // ✅ processed 전환
-            addLogEntry("System", "Blur mode enabled");
+            addLogEntry("System", "Blur mode enabled", "");
         } else {
             if (!rawCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked())
                 rawCheckBox->setChecked(true);
@@ -179,7 +181,7 @@ void MainWindow::setupUI()
             if (!rawCheckBox->isChecked() && !blurCheckBox->isChecked())
                 rawCheckBox->setChecked(true);
         }
-        addLogEntry("System", QString("PPE Detector %1").arg(checked ? "enabled" : "disabled"));
+        addLogEntry("System", QString("PPE Detector %1").arg(checked ? "enabled" : "disabled"), "");
     });
 
     QVBoxLayout *functionLayout = new QVBoxLayout();
@@ -291,18 +293,18 @@ void MainWindow::refreshVideoGrid()
     }
 }
 
-void MainWindow::addLogEntry(const QString &camera, const QString &alert)
+void MainWindow::addLogEntry(const QString &camera, const QString &alert, const QString &imagePath)
 {
     logTable->insertRow(0);
     logTable->setItem(0, 0, new QTableWidgetItem(camera));
     logTable->setItem(0, 1, new QTableWidgetItem(alert));
 
-    // ✅ 전체 로그 리스트에도 저장
-    fullLogEntries.append(qMakePair(camera, alert));
+    fullLogEntries.prepend({camera, alert, imagePath});  // ✅ prepend로 최신 항목 앞으로
 
     if (logTable->rowCount() > 20)
         logTable->removeRow(logTable->rowCount() - 1);
 }
+
 
 void MainWindow::onLogHistoryClicked()
 {
@@ -437,7 +439,8 @@ void MainWindow::pollLogsFromServer()
                                      .arg(obj["safety_vest_count"].toInt())
                                      .arg(obj["avg_confidence"].toDouble(), 0, 'f', 2);
 
-                addLogEntry("PPE", ts + " " + detail);
+                QString imgPath = obj["image_path"].toString();
+                addLogEntry("PPE", ts + " " + detail, imgPath);
 
                 // ✅ 가장 마지막 시간 갱신
                 lastPpeTimestamp = ts;
@@ -456,7 +459,7 @@ void MainWindow::pollLogsFromServer()
                     continue;
 
                 QString msg = QString("🔍 Blur 감지: 사람 %1명").arg(obj["count"].toInt());
-                addLogEntry("Blur", ts + " " + msg);
+                addLogEntry("Blur", ts + " " + msg, "");
                 lastBlurTimestamp = ts;
             }
         }
@@ -468,3 +471,51 @@ void MainWindow::pollLogsFromServer()
     });
 }
 
+void MainWindow::onAlertItemClicked(int row, int column)
+{
+    if (row >= fullLogEntries.size()) return;
+
+    const LogEntry &entry = fullLogEntries.at(row);
+    if (entry.imagePath.isEmpty()) {
+        QMessageBox::information(this, "이미지 없음", "이 항목에는 이미지가 없습니다.");
+        return;
+    }
+
+    QString ip = cameraList.isEmpty() ? "" : cameraList.first().ip;
+    if (ip.isEmpty()) {
+        QMessageBox::warning(this, "IP 없음", "카메라 IP가 없습니다.");
+        return;
+    }
+
+    QString urlStr = QString("http://%1/%2").arg(ip, entry.imagePath);
+    QUrl url(urlStr);
+    QNetworkRequest request(url);
+    QNetworkReply *reply = networkManager->get(request);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            QMessageBox::critical(this, "이미지 로딩 실패", reply->errorString());
+            return;
+        }
+
+        QPixmap pix;
+        pix.loadFromData(reply->readAll());
+        if (pix.isNull()) {
+            QMessageBox::warning(this, "이미지 오류", "유효한 이미지가 아닙니다.");
+            return;
+        }
+
+        // ✅ 새 창(QDialog)에 이미지 띄우기
+        QDialog *imgDialog = new QDialog(this);
+        imgDialog->setWindowTitle("감지 이미지");
+        QLabel *imgLabel = new QLabel();
+        imgLabel->setPixmap(pix.scaled(600, 400, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+        QVBoxLayout *layout = new QVBoxLayout(imgDialog);
+        layout->addWidget(imgLabel);
+        imgDialog->setLayout(layout);
+        imgDialog->setMinimumSize(640, 480);
+        imgDialog->exec();
+    });
+}

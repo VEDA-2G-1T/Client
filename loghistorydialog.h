@@ -1,6 +1,8 @@
 #ifndef LOGHISTORYDIALOG_H
 #define LOGHISTORYDIALOG_H
 
+#include "mainwindow.h"  // ✅ LogEntry 구조체 정의 포함
+
 #include <QDialog>
 #include <QTableWidget>
 #include <QPushButton>
@@ -14,16 +16,17 @@ class LogHistoryDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit LogHistoryDialog(QWidget *parent = nullptr, const QVector<QPair<QString, QString>>* fullLogs = nullptr);
+    explicit LogHistoryDialog(QWidget *parent = nullptr, const QVector<LogEntry>* fullLogs = nullptr);  // ✅ LogEntry로 변경
 
 private slots:
     void onCloseClicked();
+    void onRowClicked(int row, int column);  // ✅ 추가
 
 private:
     void setupUI();
     void loadHistoryData();
 
-    const QVector<QPair<QString, QString>>* logListPtr = nullptr;  // ✅ 전체 로그 목록
+    const QVector<LogEntry>* logListPtr = nullptr;  // ✅ QPair → LogEntry로 변경
     QTableWidget *historyTable;
     QPushButton *closeButton;
 };
