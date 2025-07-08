@@ -1,14 +1,6 @@
 #include "mainwindow.h"
 #include "cameralistdialog.h"
-#include "cameralistdialog.h"
 #include "loghistorydialog.h"
-
-#include <QLabel>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QGridLayout>
-#include <QScrollArea>
-#include <QTableWidget>
 
 #include <QLabel>
 #include <QPushButton>
@@ -24,25 +16,19 @@ MainWindow::MainWindow(QWidget *parent)
     setupUI();
     setWindowTitle("Smart SafetyNet");
     setMinimumSize(1000, 700);
-    setMinimumSize(1000, 700);
 
     setStyleSheet(R"(
         QWidget { background-color: #2b2b2b; color: white; }
         QLabel { color: white; }
         QTableWidget { background-color: #404040; color: white; gridline-color: #555; }
         QHeaderView::section { background-color: #353535; color: white; font-weight: bold; }
-        QWidget { background-color: #2b2b2b; color: white; }
-        QLabel { color: white; }
-        QTableWidget { background-color: #404040; color: white; gridline-color: #555; }
-        QHeaderView::section { background-color: #353535; color: white; font-weight: bold; }
         QPushButton {
-            background-color: #404040; color: white;
-            border: 1px solid #555; padding: 6px; border-radius: 4px;
-            background-color: #404040; color: white;
-            border: 1px solid #555; padding: 6px; border-radius: 4px;
+            background-color: #404040;
+            color: white;
+            border: 1px solid #555;
+            padding: 6px;
+            border-radius: 4px;
         }
-        QPushButton:hover { background-color: #505050; }
-        QCheckBox { color: white; }
         QPushButton:hover { background-color: #505050; }
         QCheckBox { color: white; }
     )");
@@ -55,10 +41,8 @@ void MainWindow::setupUI()
     centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
 
-    // ✅ 최상단 인사말 + 종료 버튼
-    // ✅ 최상단 인사말 + 종료 버튼
+    // Top bar: greeting + exit
     QLabel *greetingLabel = new QLabel("Hello admin!");
-    greetingLabel->setStyleSheet("font-size: 20px; font-weight: bold;");
     greetingLabel->setStyleSheet("font-size: 20px; font-weight: bold;");
 
     QPushButton *exitButton = new QPushButton("종료");
@@ -69,13 +53,7 @@ void MainWindow::setupUI()
     topLayout->addStretch();
     topLayout->addWidget(exitButton);
 
-    // ✅ Video Streaming 상단 라벨 + 버튼
-    QLabel *streamingLabel = new QLabel("Video Streaming");
-    streamingLabel->setStyleSheet("font-weight: bold; color: orange;");
-
-    cameraListButton = new QPushButton("카메라 리스트");
-    connect(cameraListButton, &QPushButton::clicked, this, &MainWindow::onCameraListClicked);
-    // ✅ Video Streaming 상단 라벨 + 버튼
+    // Video streaming label + button
     QLabel *streamingLabel = new QLabel("Video Streaming");
     streamingLabel->setStyleSheet("font-weight: bold; color: orange;");
 
@@ -86,12 +64,8 @@ void MainWindow::setupUI()
     streamingHeaderLayout->addWidget(streamingLabel);
     streamingHeaderLayout->addStretch();
     streamingHeaderLayout->addWidget(cameraListButton);
-    QHBoxLayout *streamingHeaderLayout = new QHBoxLayout();
-    streamingHeaderLayout->addWidget(streamingLabel);
-    streamingHeaderLayout->addStretch();
-    streamingHeaderLayout->addWidget(cameraListButton);
 
-    // ✅ Video Streaming Area
+    // Video streaming area
     videoArea = new QWidget();
     videoGridLayout = new QGridLayout(videoArea);
     videoGridLayout->setContentsMargins(0, 0, 0, 0);
@@ -103,7 +77,7 @@ void MainWindow::setupUI()
     scrollArea->setWidgetResizable(true);
     scrollArea->setWidget(videoArea);
     scrollArea->setFixedWidth(2 * 320 + 3);
-    scrollArea->setMinimumHeight(0);  // ✅ 하단 빈공간 줄이기
+    scrollArea->setMinimumHeight(0);
     scrollArea->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
     QVBoxLayout *videoLayout = new QVBoxLayout();
@@ -115,7 +89,7 @@ void MainWindow::setupUI()
     videoSection->setFixedWidth(640);
     videoSection->setStyleSheet("border: 1px solid red;");
 
-    // ✅ Log 상단 라벨 + 버튼
+    // Log label + button
     QLabel *alertLabel = new QLabel("Alert");
     alertLabel->setStyleSheet("font-weight: bold; color: orange;");
 
@@ -127,20 +101,7 @@ void MainWindow::setupUI()
     logHeaderLayout->addStretch();
     logHeaderLayout->addWidget(logHistoryButton);
 
-    // ✅ Log Table
-    // ✅ Log 상단 라벨 + 버튼
-    QLabel *alertLabel = new QLabel("Alert");
-    alertLabel->setStyleSheet("font-weight: bold; color: orange;");
-
-    QPushButton *logHistoryButton = new QPushButton("전체 로그 보기");
-    connect(logHistoryButton, &QPushButton::clicked, this, &MainWindow::onLogHistoryClicked);
-
-    QHBoxLayout *logHeaderLayout = new QHBoxLayout();
-    logHeaderLayout->addWidget(alertLabel);
-    logHeaderLayout->addStretch();
-    logHeaderLayout->addWidget(logHistoryButton);
-
-    // ✅ Log Table
+    // Log table
     logTable = new QTableWidget();
     logTable->setColumnCount(2);
     logTable->setHorizontalHeaderLabels({"Camera", "Alert"});
@@ -152,15 +113,14 @@ void MainWindow::setupUI()
 
     QVBoxLayout *logLayout = new QVBoxLayout();
     logLayout->addLayout(logHeaderLayout);
-    logLayout->addLayout(logHeaderLayout);
     logLayout->addWidget(logTable);
 
     QWidget *logSection = new QWidget();
     logSection->setLayout(logLayout);
     logSection->setStyleSheet("border: 1px solid red;");
-    logSection->setMinimumWidth(320);  // ✅ 스크롤 방지용 너비 확보
+    logSection->setMinimumWidth(320);
 
-    // ✅ Function 상단 텍스트 (버튼 기반) + 스타일 개선
+    // Function section
     QPushButton *functionLabelButton = new QPushButton("Function");
     functionLabelButton->setFlat(true);
     functionLabelButton->setStyleSheet(R"(
@@ -192,13 +152,12 @@ void MainWindow::setupUI()
     functionSection->setFixedWidth(200);
     functionSection->setStyleSheet("border: 1px solid red;");
 
-    // ✅ 영상 + 로그 + 기능 수평 정렬
+    // Main layout
     QHBoxLayout *mainBodyLayout = new QHBoxLayout();
     mainBodyLayout->addWidget(videoSection);
     mainBodyLayout->addWidget(logSection);
     mainBodyLayout->addWidget(functionSection);
 
-    // ✅ 전체 수직 레이아웃
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
     mainLayout->addLayout(topLayout);
     mainLayout->addLayout(mainBodyLayout);
@@ -213,20 +172,18 @@ void MainWindow::onCameraListClicked()
         connect(cameraListDialog, &CameraListDialog::cameraListUpdated, this, &MainWindow::refreshVideoGrid);
     }
 
-    cameraListDialog->refreshTable();  // ✅ 항상 최신 정보로 갱신
+    cameraListDialog->refreshTable();
     cameraListDialog->show();
     cameraListDialog->raise();
     cameraListDialog->activateWindow();
 }
 
-
 void MainWindow::refreshVideoGrid()
 {
     QLayoutItem *child;
     while ((child = videoGridLayout->takeAt(0)) != nullptr) {
-        if (child->widget()) {
+        if (child->widget())
             child->widget()->deleteLater();
-        }
         delete child;
     }
 
@@ -240,8 +197,6 @@ void MainWindow::refreshVideoGrid()
     int total = std::max(4, static_cast<int>(cameraList.size()));
     int columns = 2;
     int rows = (total + 1) / 2;
-
-    // ✅ videoArea 크기 강제 지정 (스크롤바 방지)
     videoArea->setMinimumSize(columns * 320, rows * 240);
 
     for (int i = 0; i < total; ++i) {
@@ -277,14 +232,12 @@ void MainWindow::refreshVideoGrid()
     }
 }
 
-
 void MainWindow::addLogEntry(const QString &camera, const QString &alert)
 {
     logTable->insertRow(0);
     logTable->setItem(0, 0, new QTableWidgetItem(camera));
     logTable->setItem(0, 1, new QTableWidgetItem(alert));
 
-    if (logTable->rowCount() > 20)
     if (logTable->rowCount() > 20)
         logTable->removeRow(logTable->rowCount() - 1);
 }
@@ -298,8 +251,8 @@ void MainWindow::onLogHistoryClicked()
 void MainWindow::onPPEDetectorToggled(bool enabled)
 {
     if (enabled && mosaicerCheckBox->isChecked())
-    if (enabled && mosaicerCheckBox->isChecked())
         mosaicerCheckBox->setChecked(false);
+
     addLogEntry("System", QString("PPE Detector %1").arg(enabled ? "enabled" : "disabled"));
 }
 
@@ -307,13 +260,6 @@ void MainWindow::onMosaicerToggled(bool enabled)
 {
     if (enabled && ppeDetectorCheckBox->isChecked())
         ppeDetectorCheckBox->setChecked(false);
-    addLogEntry("System", QString("Mosaicer %1").arg(enabled ? "enabled" : "disabled"));
-    addLogEntry("System", QString("PPE Detector %1").arg(enabled ? "enabled" : "disabled"));
-}
 
-void MainWindow::onMosaicerToggled(bool enabled)
-{
-    if (enabled && ppeDetectorCheckBox->isChecked())
-        ppeDetectorCheckBox->setChecked(false);
     addLogEntry("System", QString("Mosaicer %1").arg(enabled ? "enabled" : "disabled"));
 }
