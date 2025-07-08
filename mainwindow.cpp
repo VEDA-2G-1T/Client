@@ -268,7 +268,17 @@ void MainWindow::refreshVideoGrid()
         rawCheckBox->setChecked(true);
     }
     if (cameraList.isEmpty()) {
-        rawCheckBox->setChecked(false);  // ✅ 모든 카메라 삭제 시 Raw 체크 해제
+        rawCheckBox->blockSignals(true);
+        blurCheckBox->blockSignals(true);
+        ppeDetectorCheckBox->blockSignals(true);
+
+        rawCheckBox->setChecked(false);
+        blurCheckBox->setChecked(false);
+        ppeDetectorCheckBox->setChecked(false);
+
+        rawCheckBox->blockSignals(false);
+        blurCheckBox->blockSignals(false);
+        ppeDetectorCheckBox->blockSignals(false);        // ✅ 모든 카메라 삭제 시 모든 기능 체크 해제
     }
 }
 
@@ -290,18 +300,12 @@ void MainWindow::onLogHistoryClicked()
 
 void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &camera)
 {
-    qDebug() << "[📡 sendModeChangeRequest]";
-    qDebug() << "mode:" << mode;
-    qDebug() << "camera.ip:" << camera.ip;
-    qDebug() << "camera.port:" << camera.port;
-
     if (camera.ip.isEmpty() || camera.port.isEmpty()) {
         QMessageBox::warning(this, "카메라 정보 오류", "카메라 IP 또는 포트가 비어있습니다.");
         return;
     }
 
-    QString apiUrl = QString("http://%1/api/mode").arg(camera.ip, camera.port);
-    qDebug() << "[Mode Change] URL: " << apiUrl;
+    QString apiUrl = QString("http://%1/api/mode").arg(camera.ip);
     QUrl url(apiUrl);
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
@@ -311,22 +315,13 @@ void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &ca
     QJsonDocument doc(json);
     QByteArray data = doc.toJson();
 
-    qDebug() << "[Mode Change] URL: " << url.toString();       // 추가
-    qDebug() << "[Mode Change] Body: " << data;                // 추가
-
     QNetworkReply *reply = networkManager->post(request, data);
 
     connect(reply, &QNetworkReply::finished, this, [=]() {
         reply->deleteLater();
         if (reply->error() == QNetworkReply::NoError) {
             QByteArray responseData = reply->readAll();
-            qDebug() << "[Mode Change] Response raw:" << responseData;
-
             QJsonDocument responseDoc = QJsonDocument::fromJson(responseData);
-            qDebug() << "[Mode Change] Response JSON:" << responseDoc.toJson(QJsonDocument::Indented);
-
-            qDebug() << "[HTTP Status]" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-            qDebug() << "[Content-Type]" << reply->header(QNetworkRequest::ContentTypeHeader).toString();
 
             QString status = responseDoc["status"].toString();
             QString message = responseDoc["message"].toString();
@@ -335,12 +330,11 @@ void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &ca
                 QMessageBox::warning(this, "모드 변경 실패", message);
             }
         } else {
-            qDebug() << "[Network Error]" << reply->errorString();  // ✅ 네트워크 에러 로그도 출력
             QMessageBox::critical(this, "네트워크 오류", reply->errorString());
         }
     });
-
 }
+
 
 
 void MainWindow::switchStreamForAllPlayers(const QString &suffix)
