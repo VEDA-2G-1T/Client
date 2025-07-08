@@ -50,6 +50,7 @@ private:
     QVector<CameraInfo> cameraList;
     QVector<QMediaPlayer*> players;
     QVector<QVideoWidget*> videoWidgets;
+    QVector<QPair<QString, QString>> fullLogEntries; // (Camera, Alert)
 
     QWidget *centralWidget;
     QWidget *videoArea;

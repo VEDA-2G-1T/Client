@@ -1,8 +1,9 @@
 #include "loghistorydialog.h"
 #include <QDateTime>
+#include <QTableWidgetItem>
 
-LogHistoryDialog::LogHistoryDialog(QWidget *parent)
-    : QDialog(parent)
+LogHistoryDialog::LogHistoryDialog(QWidget *parent, const QVector<QPair<QString, QString>>* fullLogs)
+    : QDialog(parent), logListPtr(fullLogs)
 {
     setupUI();
     loadHistoryData();
@@ -24,8 +25,6 @@ void LogHistoryDialog::setupUI()
     historyTable->setHorizontalHeaderLabels(QStringList() << "Timestamp" << "Camera" << "Event");
     historyTable->horizontalHeader()->setStretchLastSection(true);
     historyTable->setAlternatingRowColors(true);
-
-    // ✅ 행 번호 헤더 숨기기
     historyTable->verticalHeader()->setVisible(false);
 
     // Close button
@@ -39,10 +38,9 @@ void LogHistoryDialog::setupUI()
     mainLayout->addWidget(historyTable);
     mainLayout->addLayout(buttonLayout);
 
-    // Connect signals
     connect(closeButton, &QPushButton::clicked, this, &LogHistoryDialog::onCloseClicked);
 
-    // Apply dark theme
+    // Dark theme
     setStyleSheet(R"(
         QDialog {
             background-color: #2b2b2b;
@@ -61,12 +59,10 @@ void LogHistoryDialog::setupUI()
         QTableWidget::item {
             padding: 8px;
         }
-
         QTableWidget::item:focus {
-            outline: none;     // ✅ 하얀 테두리 제거
+            outline: none;
             border: none;
         }
-
         QHeaderView::section {
             background-color: #353535;
             color: white;
@@ -90,42 +86,26 @@ void LogHistoryDialog::setupUI()
 
 void LogHistoryDialog::loadHistoryData()
 {
-    // Sample history data
-    QStringList sampleEvents = {
-        "System started",
-        "Camera 1 connected",
-        "Motion detected",
-        "PPE violation detected",
-        "Mosaicer enabled",
-        "Camera 2 connected",
-        "Normal operation resumed",
-        "PPE Detector disabled",
-        "Camera switched to Camera 2",
-        "Alert cleared",
-        "System maintenance",
-        "Camera 1 reconnected"
-    };
+    if (!logListPtr) return;
 
-    QStringList cameras = {"System", "Camera 1", "Camera 2", "Camera 1", "System", "Camera 2", "Camera 1", "System", "System", "Camera 2", "System", "Camera 1"};
+    for (int i = 0; i < logListPtr->size(); ++i) {
+        const QString& camera = logListPtr->at(i).first;
+        const QString& alert = logListPtr->at(i).second;
 
-    QDateTime currentTime = QDateTime::currentDateTime();
-
-    for (int i = 0; i < sampleEvents.size(); ++i) {
         int row = historyTable->rowCount();
         historyTable->insertRow(row);
 
-        // Timestamp (going backwards in time)
-        QDateTime eventTime = currentTime.addSecs(-i * 300); // 5 minutes apart
-        historyTable->setItem(row, 0, new QTableWidgetItem(eventTime.toString("yyyy-MM-dd hh:mm:ss")));
+        // ✅ Timestamp가 alert 문자열 안에 있는 경우 추출
+        // 예: "2025-07-08 15:14:17 👷 1명 | ..." → 앞의 19자
+        QString timestamp = "Unknown";
+        if (alert.length() >= 19 && alert[4].isDigit())
+            timestamp = alert.left(19);
 
-        // Camera
-        historyTable->setItem(row, 1, new QTableWidgetItem(cameras[i]));
-
-        // Event
-        historyTable->setItem(row, 2, new QTableWidgetItem(sampleEvents[i]));
+        historyTable->setItem(row, 0, new QTableWidgetItem(timestamp));
+        historyTable->setItem(row, 1, new QTableWidgetItem(camera));
+        historyTable->setItem(row, 2, new QTableWidgetItem(alert));
     }
 
-    // Resize columns to content
     historyTable->resizeColumnsToContents();
 }
 

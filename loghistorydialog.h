@@ -14,7 +14,7 @@ class LogHistoryDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit LogHistoryDialog(QWidget *parent = nullptr);
+    explicit LogHistoryDialog(QWidget *parent = nullptr, const QVector<QPair<QString, QString>>* fullLogs = nullptr);
 
 private slots:
     void onCloseClicked();
@@ -23,6 +23,7 @@ private:
     void setupUI();
     void loadHistoryData();
 
+    const QVector<QPair<QString, QString>>* logListPtr = nullptr;  // ✅ 전체 로그 목록
     QTableWidget *historyTable;
     QPushButton *closeButton;
 };

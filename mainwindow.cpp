@@ -297,13 +297,16 @@ void MainWindow::addLogEntry(const QString &camera, const QString &alert)
     logTable->setItem(0, 0, new QTableWidgetItem(camera));
     logTable->setItem(0, 1, new QTableWidgetItem(alert));
 
+    // ✅ 전체 로그 리스트에도 저장
+    fullLogEntries.append(qMakePair(camera, alert));
+
     if (logTable->rowCount() > 20)
         logTable->removeRow(logTable->rowCount() - 1);
 }
 
 void MainWindow::onLogHistoryClicked()
 {
-    LogHistoryDialog dialog(this);
+    LogHistoryDialog dialog(this, &fullLogEntries);  // ✅ 로그 목록 전달
     dialog.exec();
 }
 
