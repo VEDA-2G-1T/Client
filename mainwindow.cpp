@@ -33,7 +33,6 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow() {}
 
-/*
 void MainWindow::setupUI()
 {
     centralWidget = new QWidget(this);
@@ -75,123 +74,8 @@ void MainWindow::setupUI()
     scrollArea->setWidgetResizable(true);
     scrollArea->setWidget(videoArea);
     scrollArea->setFixedWidth(2 * 320 + 3);
-    scrollArea->setMinimumHeight(500);
-
-    QVBoxLayout *videoLayout = new QVBoxLayout();
-    videoLayout->addLayout(streamingHeaderLayout);
-    videoLayout->addWidget(scrollArea);
-
-    QWidget *videoSection = new QWidget();
-    videoSection->setLayout(videoLayout);
-    videoSection->setStyleSheet("border: 1px solid red;");
-
-    // ✅ Log 상단 라벨 + 버튼
-    QLabel *alertLabel = new QLabel("Alert");
-    alertLabel->setStyleSheet("font-weight: bold; color: orange;");
-
-    QPushButton *logHistoryButton = new QPushButton("전체 로그 보기");
-    connect(logHistoryButton, &QPushButton::clicked, this, &MainWindow::onLogHistoryClicked);
-
-    QHBoxLayout *logHeaderLayout = new QHBoxLayout();
-    logHeaderLayout->addWidget(alertLabel);
-    logHeaderLayout->addStretch();
-    logHeaderLayout->addWidget(logHistoryButton);
-
-    // ✅ Log Table
-    logTable = new QTableWidget();
-    logTable->setColumnCount(2);
-    logTable->setHorizontalHeaderLabels({"Camera", "Alert"});
-    logTable->horizontalHeader()->setStretchLastSection(true);
-    logTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    logTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    logTable->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    logTable->verticalHeader()->setVisible(false);
-
-    QVBoxLayout *logLayout = new QVBoxLayout();
-    logLayout->addLayout(logHeaderLayout);
-    logLayout->addWidget(logTable);
-
-    QWidget *logSection = new QWidget();
-    logSection->setLayout(logLayout);
-    logSection->setStyleSheet("border: 1px solid red;");
-
-    // ✅ Function 상단 라벨
-    QLabel *functionLabel = new QLabel("Function");
-    functionLabel->setStyleSheet("font-weight: bold; color: orange;");
-
-    ppeDetectorCheckBox = new QCheckBox("PPE Detector");
-    connect(ppeDetectorCheckBox, &QCheckBox::toggled, this, &MainWindow::onPPEDetectorToggled);
-
-    mosaicerCheckBox = new QCheckBox("Mosaicer");
-    connect(mosaicerCheckBox, &QCheckBox::toggled, this, &MainWindow::onMosaicerToggled);
-
-    QVBoxLayout *functionLayout = new QVBoxLayout();
-    functionLayout->addWidget(functionLabel);
-    functionLayout->addWidget(ppeDetectorCheckBox);
-    functionLayout->addWidget(mosaicerCheckBox);
-    functionLayout->addStretch();
-
-    QWidget *functionSection = new QWidget();
-    functionSection->setLayout(functionLayout);
-    functionSection->setStyleSheet("border: 1px solid red;");
-
-    // ✅ 영상 + 로그 + 기능 수평 정렬
-    QHBoxLayout *mainBodyLayout = new QHBoxLayout();
-    mainBodyLayout->addWidget(videoSection);
-    mainBodyLayout->addWidget(logSection);
-    mainBodyLayout->addWidget(functionSection);
-
-    // ✅ 전체 수직 레이아웃
-    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->addLayout(topLayout);
-    mainLayout->addLayout(mainBodyLayout);
-
-    refreshVideoGrid();
-}
-*/
-
-void MainWindow::setupUI()
-{
-    centralWidget = new QWidget(this);
-    setCentralWidget(centralWidget);
-
-    // ✅ 최상단 인사말 + 종료 버튼
-    QLabel *greetingLabel = new QLabel("Hello admin!");
-    greetingLabel->setStyleSheet("font-size: 20px; font-weight: bold;");
-
-    QPushButton *exitButton = new QPushButton("종료");
-    connect(exitButton, &QPushButton::clicked, this, &MainWindow::close);
-
-    QHBoxLayout *topLayout = new QHBoxLayout();
-    topLayout->addWidget(greetingLabel);
-    topLayout->addStretch();
-    topLayout->addWidget(exitButton);
-
-    // ✅ Video Streaming 상단 라벨 + 버튼
-    QLabel *streamingLabel = new QLabel("Video Streaming");
-    streamingLabel->setStyleSheet("font-weight: bold; color: orange;");
-
-    cameraListButton = new QPushButton("카메라 리스트");
-    connect(cameraListButton, &QPushButton::clicked, this, &MainWindow::onCameraListClicked);
-
-    QHBoxLayout *streamingHeaderLayout = new QHBoxLayout();
-    streamingHeaderLayout->addWidget(streamingLabel);
-    streamingHeaderLayout->addStretch();
-    streamingHeaderLayout->addWidget(cameraListButton);
-
-    // ✅ Video Streaming Area
-    videoArea = new QWidget();
-    videoGridLayout = new QGridLayout(videoArea);
-    videoGridLayout->setContentsMargins(0, 0, 0, 0);
-    videoGridLayout->setHorizontalSpacing(1);
-    videoGridLayout->setVerticalSpacing(1);
-    videoGridLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-
-    scrollArea = new QScrollArea();
-    scrollArea->setWidgetResizable(true);
-    scrollArea->setWidget(videoArea);
-    scrollArea->setFixedWidth(2 * 320 + 3);
-    scrollArea->setMinimumHeight(500);
+    scrollArea->setMinimumHeight(0);  // ✅ 하단 빈공간 줄이기
+    scrollArea->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
     QVBoxLayout *videoLayout = new QVBoxLayout();
     videoLayout->addLayout(streamingHeaderLayout);
@@ -231,8 +115,9 @@ void MainWindow::setupUI()
     QWidget *logSection = new QWidget();
     logSection->setLayout(logLayout);
     logSection->setStyleSheet("border: 1px solid red;");
+    logSection->setMinimumWidth(320);  // ✅ 스크롤 방지용 너비 확보
 
-    // ✅ Function 상단 라벨 → 버튼처럼 안보이게 처리
+    // ✅ Function 상단 텍스트 (버튼 기반) + 스타일 개선
     QPushButton *functionLabelButton = new QPushButton("Function");
     functionLabelButton->setFlat(true);
     functionLabelButton->setStyleSheet(R"(
@@ -240,11 +125,10 @@ void MainWindow::setupUI()
             background-color: transparent;
             color: orange;
             font-weight: bold;
-            border: none;
+            border: 1px solid red;
         }
         QPushButton:hover {
             color: #ffae42;
-            text-decoration: underline;
         }
     )");
 
@@ -262,7 +146,7 @@ void MainWindow::setupUI()
 
     QWidget *functionSection = new QWidget();
     functionSection->setLayout(functionLayout);
-    functionSection->setFixedWidth(200);  // ← 원하는 만큼 px 단위로 조정
+    functionSection->setFixedWidth(200);
     functionSection->setStyleSheet("border: 1px solid red;");
 
     // ✅ 영상 + 로그 + 기능 수평 정렬
@@ -278,7 +162,6 @@ void MainWindow::setupUI()
 
     refreshVideoGrid();
 }
-
 
 void MainWindow::onCameraListClicked()
 {
