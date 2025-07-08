@@ -12,6 +12,9 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkReply>
+#include <QTimer>  // ✅ 이 줄을 추가!
+#include <QJsonArray>  // ✅ 이 줄 추가!
+
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -21,6 +24,11 @@ MainWindow::MainWindow(QWidget *parent)
     setMinimumSize(1000, 700);
 
     networkManager = new QNetworkAccessManager(this);
+
+    // ✅ 실시간 로그 수신용 타이머 추가
+    QTimer *logTimer = new QTimer(this);
+    connect(logTimer, &QTimer::timeout, this, &MainWindow::pollLogsFromServer);
+    logTimer->start(2000);  // 2초마다 poll
 
     setStyleSheet(R"(
         QWidget { background-color: #2b2b2b; color: white; }
@@ -37,6 +45,7 @@ MainWindow::MainWindow(QWidget *parent)
         QPushButton:hover { background-color: #505050; }
         QCheckBox { color: white; }
     )");
+    qDebug() << "MainWindow 생성됨";
 }
 
 MainWindow::~MainWindow() {}
@@ -350,3 +359,109 @@ void MainWindow::switchStreamForAllPlayers(const QString &suffix)
         players[i]->play();  // 새 스트림 시작
     }
 }
+
+void MainWindow::pollLogsFromServer()
+{
+    qDebug() << "🔁 pollLogsFromServer 호출됨";
+
+    if (cameraList.isEmpty()) {
+        qDebug() << "📭 카메라 없음, 요청 중단";
+        return;
+    }
+
+    const CameraInfo &camera = cameraList.first();
+    QString baseUrl = QString("http://%1").arg(camera.ip).arg(camera.port);
+
+    QString endpoint;
+    if (ppeDetectorCheckBox->isChecked()) {
+        endpoint = "/api/detections";
+        qDebug() << "📡 PPE 모드, 요청 대상:" << baseUrl + endpoint;
+    }
+    else if (blurCheckBox->isChecked()) {
+        endpoint = "/api/blur";
+        qDebug() << "📡 Blur 모드, 요청 대상:" << baseUrl + endpoint;
+    }
+    else {
+        qDebug() << "⚠️ Raw 모드, 로그 요청 안 함";
+        return;
+    }
+
+    QUrl url(baseUrl + endpoint);
+    QNetworkRequest request(url);
+    QNetworkReply *reply = networkManager->get(request);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        QByteArray rawData = reply->readAll();
+        qDebug() << "📨 수신된 원본 데이터:" << rawData;
+
+        if (reply->error() != QNetworkReply::NoError) {
+            qDebug() << "❌ 네트워크 오류:" << reply->errorString();
+            reply->deleteLater();
+            return;
+        }
+
+        QJsonDocument doc = QJsonDocument::fromJson(rawData);
+        if (doc.isNull() || !doc.isObject()) {
+            qDebug() << "❗ JSON 파싱 실패";
+            reply->deleteLater();
+            return;
+        }
+
+        QJsonObject root = doc.object();
+        qDebug() << "✅ 파싱된 JSON 객체:" << root;
+
+        if (root["status"].toString() != "success") {
+            qDebug() << "⚠️ status != success →" << root["status"].toString();
+            reply->deleteLater();
+            return;
+        }
+
+        if (root.contains("detections")) {
+            QJsonArray arr = root["detections"].toArray();
+            qDebug() << "👀 탐지 로그 개수:" << arr.size();
+
+            for (const QJsonValue &val : arr) {
+                QJsonObject obj = val.toObject();
+                QString ts = obj["timestamp"].toString();
+
+                // ✅ 이미 처리한 로그는 무시
+                if (!lastPpeTimestamp.isEmpty() && ts <= lastPpeTimestamp)
+                    continue;
+
+                QString detail = QString("👷 %1명 | ⛑️ %2명 | 🦺 %3명 | 신뢰도: %4")
+                                     .arg(obj["person_count"].toInt())
+                                     .arg(obj["helmet_count"].toInt())
+                                     .arg(obj["safety_vest_count"].toInt())
+                                     .arg(obj["avg_confidence"].toDouble(), 0, 'f', 2);
+
+                addLogEntry("PPE", ts + " " + detail);
+
+                // ✅ 가장 마지막 시간 갱신
+                lastPpeTimestamp = ts;
+            }
+        }
+
+        if (root.contains("person_counts")) {
+            QJsonArray arr = root["person_counts"].toArray();
+            qDebug() << "👀 Blur 로그 개수:" << arr.size();
+
+            for (const QJsonValue &val : arr) {
+                QJsonObject obj = val.toObject();
+                QString ts = obj["timestamp"].toString();
+
+                if (!lastBlurTimestamp.isEmpty() && ts <= lastBlurTimestamp)
+                    continue;
+
+                QString msg = QString("🔍 Blur 감지: 사람 %1명").arg(obj["count"].toInt());
+                addLogEntry("Blur", ts + " " + msg);
+                lastBlurTimestamp = ts;
+            }
+        }
+         else {
+            qDebug() << "⚠️ 'detections' or 'person_counts' key 없음";
+        }
+
+        reply->deleteLater();
+    });
+}
+

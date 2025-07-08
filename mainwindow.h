@@ -41,6 +41,7 @@ private slots:
     void onCameraListClicked();
     void onLogHistoryClicked();
     void sendModeChangeRequest(const QString &mode, const CameraInfo &camera);
+    void pollLogsFromServer();
 
 private:
     void setupUI();
@@ -61,6 +62,9 @@ private:
     QCheckBox *rawCheckBox;
     QCheckBox *blurCheckBox;
     QCheckBox *ppeDetectorCheckBox;
+
+    QString lastPpeTimestamp;  // 최신 PPE 로그 시간
+    QString lastBlurTimestamp; // 최신 Blur 로그 시간 (추가해도 좋음)
 
     void switchStreamForAllPlayers(const QString &suffix);
 
