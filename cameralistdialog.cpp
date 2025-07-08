@@ -46,8 +46,8 @@ CameraListDialog::CameraListDialog(QWidget *parent, QVector<CameraInfo>* cameraL
 
 void CameraListDialog::setupUI()
 {
-    table = new QTableWidget(0, 5);
-    table->setHorizontalHeaderLabels(QStringList() << "스트리밍 영역" << "카메라 이름" << "카메라 IP" << "포트번호" << "스트림 식별자");
+    table = new QTableWidget(0, 4);
+    table->setHorizontalHeaderLabels(QStringList() << "스트리밍 영역" << "카메라 이름" << "카메라 IP" << "포트번호");
     table->horizontalHeader()->setStretchLastSection(true);
     table->verticalHeader()->setVisible(false);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -79,7 +79,6 @@ void CameraListDialog::refreshTable()
         table->setItem(i, 1, new QTableWidgetItem(cam.name));
         table->setItem(i, 2, new QTableWidgetItem(cam.ip));
         table->setItem(i, 3, new QTableWidgetItem(cam.port));
-        table->setItem(i, 4, new QTableWidgetItem(cam.streamId));
     }
 }
 
@@ -91,7 +90,6 @@ void CameraListDialog::onAddCamera()
         info.name = dialog.getCameraName();
         info.ip = dialog.getCameraIP();
         info.port = dialog.getCameraPort();
-        info.streamId = dialog.getStreamId();
 
         cameraListRef->append(info);
         refreshTable();

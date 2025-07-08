@@ -5,17 +5,22 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include <QGridLayout>
+#include <QHBoxLayout>
 #include <QScrollArea>
-#include <QTableWidget>
+#include <QMessageBox>
 #include <QHeaderView>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QNetworkReply>
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), currentCameraNumber(1)
+    : QMainWindow(parent)
 {
     setupUI();
     setWindowTitle("Smart SafetyNet");
     setMinimumSize(1000, 700);
+
+    networkManager = new QNetworkAccessManager(this);
 
     setStyleSheet(R"(
         QWidget { background-color: #2b2b2b; color: white; }
@@ -41,7 +46,6 @@ void MainWindow::setupUI()
     centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
 
-    // Top bar: greeting + exit
     QLabel *greetingLabel = new QLabel("Hello admin!");
     greetingLabel->setStyleSheet("font-size: 20px; font-weight: bold;");
 
@@ -53,7 +57,6 @@ void MainWindow::setupUI()
     topLayout->addStretch();
     topLayout->addWidget(exitButton);
 
-    // Video streaming label + button
     QLabel *streamingLabel = new QLabel("Video Streaming");
     streamingLabel->setStyleSheet("font-weight: bold; color: orange;");
 
@@ -65,20 +68,16 @@ void MainWindow::setupUI()
     streamingHeaderLayout->addStretch();
     streamingHeaderLayout->addWidget(cameraListButton);
 
-    // Video streaming area
     videoArea = new QWidget();
     videoGridLayout = new QGridLayout(videoArea);
     videoGridLayout->setContentsMargins(0, 0, 0, 0);
-    videoGridLayout->setHorizontalSpacing(1);
-    videoGridLayout->setVerticalSpacing(1);
+    videoGridLayout->setSpacing(1);
     videoGridLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
 
     scrollArea = new QScrollArea();
     scrollArea->setWidgetResizable(true);
     scrollArea->setWidget(videoArea);
     scrollArea->setFixedWidth(2 * 320 + 3);
-    scrollArea->setMinimumHeight(0);
-    scrollArea->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
     QVBoxLayout *videoLayout = new QVBoxLayout();
     videoLayout->addLayout(streamingHeaderLayout);
@@ -89,7 +88,6 @@ void MainWindow::setupUI()
     videoSection->setFixedWidth(640);
     videoSection->setStyleSheet("border: 1px solid red;");
 
-    // Log label + button
     QLabel *alertLabel = new QLabel("Alert");
     alertLabel->setStyleSheet("font-weight: bold; color: orange;");
 
@@ -101,14 +99,12 @@ void MainWindow::setupUI()
     logHeaderLayout->addStretch();
     logHeaderLayout->addWidget(logHistoryButton);
 
-    // Log table
     logTable = new QTableWidget();
     logTable->setColumnCount(2);
     logTable->setHorizontalHeaderLabels({"Camera", "Alert"});
     logTable->horizontalHeader()->setStretchLastSection(true);
     logTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     logTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    logTable->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     logTable->verticalHeader()->setVisible(false);
 
     QVBoxLayout *logLayout = new QVBoxLayout();
@@ -120,7 +116,6 @@ void MainWindow::setupUI()
     logSection->setStyleSheet("border: 1px solid red;");
     logSection->setMinimumWidth(320);
 
-    // Function section
     QPushButton *functionLabelButton = new QPushButton("Function");
     functionLabelButton->setFlat(true);
     functionLabelButton->setStyleSheet(R"(
@@ -135,16 +130,51 @@ void MainWindow::setupUI()
         }
     )");
 
+    rawCheckBox = new QCheckBox("Raw");
+    blurCheckBox = new QCheckBox("Blur");
     ppeDetectorCheckBox = new QCheckBox("PPE Detector");
-    connect(ppeDetectorCheckBox, &QCheckBox::toggled, this, &MainWindow::onPPEDetectorToggled);
 
-    mosaicerCheckBox = new QCheckBox("Mosaicer");
-    connect(mosaicerCheckBox, &QCheckBox::toggled, this, &MainWindow::onMosaicerToggled);
+    connect(rawCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
+        if (checked) {
+            blurCheckBox->setChecked(false);
+            ppeDetectorCheckBox->setChecked(false);
+            addLogEntry("System", "Raw mode enabled");
+        }
+    });
+
+    connect(blurCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
+        if (checked) {
+            rawCheckBox->setChecked(false);
+            ppeDetectorCheckBox->setChecked(false);
+            if (!cameraList.isEmpty()) {
+                sendModeChangeRequest("blur", cameraList.first());
+            }
+            addLogEntry("System", "Blur mode enabled");
+        } else {
+            if (!rawCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked())
+                rawCheckBox->setChecked(true);
+        }
+    });
+
+    connect(ppeDetectorCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
+        if (checked) {
+            rawCheckBox->setChecked(false);
+            blurCheckBox->setChecked(false);
+            if (!cameraList.isEmpty()) {
+                sendModeChangeRequest("detect", cameraList.first());
+            }
+        } else {
+            if (!rawCheckBox->isChecked() && !blurCheckBox->isChecked())
+                rawCheckBox->setChecked(true);
+        }
+        addLogEntry("System", QString("PPE Detector %1").arg(checked ? "enabled" : "disabled"));
+    });
 
     QVBoxLayout *functionLayout = new QVBoxLayout();
     functionLayout->addWidget(functionLabelButton);
+    functionLayout->addWidget(rawCheckBox);
+    functionLayout->addWidget(blurCheckBox);
     functionLayout->addWidget(ppeDetectorCheckBox);
-    functionLayout->addWidget(mosaicerCheckBox);
     functionLayout->addStretch();
 
     QWidget *functionSection = new QWidget();
@@ -152,7 +182,6 @@ void MainWindow::setupUI()
     functionSection->setFixedWidth(200);
     functionSection->setStyleSheet("border: 1px solid red;");
 
-    // Main layout
     QHBoxLayout *mainBodyLayout = new QHBoxLayout();
     mainBodyLayout->addWidget(videoSection);
     mainBodyLayout->addWidget(logSection);
@@ -230,6 +259,14 @@ void MainWindow::refreshVideoGrid()
 
         videoGridLayout->addWidget(videoFrame, i / columns, i % columns);
     }
+
+    // ✅ 카메라가 있고 Blur/PPE가 선택 안되어 있을 때만 Raw 체크
+    if (!cameraList.isEmpty() && !blurCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
+        rawCheckBox->setChecked(true);
+    }
+    if (cameraList.isEmpty()) {
+        rawCheckBox->setChecked(false);  // ✅ 모든 카메라 삭제 시 Raw 체크 해제
+    }
 }
 
 void MainWindow::addLogEntry(const QString &camera, const QString &alert)
@@ -248,18 +285,36 @@ void MainWindow::onLogHistoryClicked()
     dialog.exec();
 }
 
-void MainWindow::onPPEDetectorToggled(bool enabled)
+void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &camera)
 {
-    if (enabled && mosaicerCheckBox->isChecked())
-        mosaicerCheckBox->setChecked(false);
+    QString apiUrl = QString("http://%1:%2/api/mode").arg(camera.ip, camera.port);
+    QUrl url(apiUrl);
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
-    addLogEntry("System", QString("PPE Detector %1").arg(enabled ? "enabled" : "disabled"));
-}
+    QJsonObject json;
+    json["mode"] = mode;
+    QJsonDocument doc(json);
+    QByteArray data = doc.toJson();
 
-void MainWindow::onMosaicerToggled(bool enabled)
-{
-    if (enabled && ppeDetectorCheckBox->isChecked())
-        ppeDetectorCheckBox->setChecked(false);
+    QNetworkReply *reply = networkManager->post(request, data);
 
-    addLogEntry("System", QString("Mosaicer %1").arg(enabled ? "enabled" : "disabled"));
+    connect(reply, &QNetworkReply::sslErrors, this, [=](const QList<QSslError> &) {
+        reply->ignoreSslErrors();  // ⚠️ 테스트 목적
+    });
+
+    connect(reply, &QNetworkReply::finished, this, [=]() {
+        reply->deleteLater();
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonDocument responseDoc = QJsonDocument::fromJson(reply->readAll());
+            QString status = responseDoc["status"].toString();
+            QString message = responseDoc["message"].toString();
+
+            if (status != "success") {
+                QMessageBox::warning(this, "모드 변경 실패", message);
+            }
+        } else {
+            QMessageBox::critical(this, "네트워크 오류", reply->errorString());
+        }
+    });
 }

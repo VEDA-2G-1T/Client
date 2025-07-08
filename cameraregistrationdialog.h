@@ -15,7 +15,6 @@ public:
     QString getCameraName() const;
     QString getCameraIP() const;
     QString getCameraPort() const;
-    QString getStreamId() const;
 
 private slots:
     void onOkClicked();
@@ -27,7 +26,6 @@ private:
     QLineEdit *nameEdit;
     QLineEdit *ipEdit;
     QLineEdit *portEdit;
-    QLineEdit *streamIdEdit;
 
     QPushButton *okButton;
     QPushButton *cancelButton;

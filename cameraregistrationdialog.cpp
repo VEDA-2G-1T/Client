@@ -67,11 +67,6 @@ void CameraRegistrationDialog::setupUI()
     portEdit = new QLineEdit();
     portEdit->setPlaceholderText("예: 8554");
 
-    // 스트림 식별자
-    QLabel *streamLabel = new QLabel("스트림 식별자:");
-    streamIdEdit = new QLineEdit();
-    streamIdEdit->setPlaceholderText("예: mooostream");
-
     // 버튼 생성
     okButton = new QPushButton("등록");
     cancelButton = new QPushButton("취소");
@@ -103,8 +98,6 @@ void CameraRegistrationDialog::setupUI()
     mainLayout->addWidget(ipEdit);
     mainLayout->addWidget(portLabel);
     mainLayout->addWidget(portEdit);
-    mainLayout->addWidget(streamLabel);
-    mainLayout->addWidget(streamIdEdit);
     mainLayout->addLayout(btnLayout);
 
     // ✅ 다이얼로그 크기 확장 (진짜 중요!)
@@ -143,8 +136,7 @@ void CameraRegistrationDialog::onOkClicked()
 {
     if (nameEdit->text().trimmed().isEmpty() ||
         ipEdit->text().trimmed().isEmpty() ||
-        portEdit->text().trimmed().isEmpty() ||
-        streamIdEdit->text().trimmed().isEmpty()) {
+        portEdit->text().trimmed().isEmpty()) {
         QMessageBox::warning(this, "입력 오류", "모든 항목을 입력해주세요.");
         return;
     }
@@ -161,4 +153,3 @@ void CameraRegistrationDialog::onCancelClicked()
 QString CameraRegistrationDialog::getCameraName() const { return nameEdit->text().trimmed(); }
 QString CameraRegistrationDialog::getCameraIP() const { return ipEdit->text().trimmed(); }
 QString CameraRegistrationDialog::getCameraPort() const { return portEdit->text().trimmed(); }
-QString CameraRegistrationDialog::getStreamId() const { return streamIdEdit->text().trimmed(); }

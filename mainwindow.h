@@ -5,7 +5,6 @@
 #include <QVector>
 #include <QString>
 #include <QWidget>
-#include <QVBoxLayout>
 #include <QGridLayout>
 #include <QScrollArea>
 #include <QPushButton>
@@ -14,6 +13,7 @@
 #include <QTableWidget>
 #include <QMediaPlayer>
 #include <QVideoWidget>
+#include <QNetworkAccessManager>
 
 class CameraListDialog;
 
@@ -21,10 +21,9 @@ struct CameraInfo {
     QString name;
     QString ip;
     QString port;
-    QString streamId;
 
     QString rtspUrl() const {
-        return QString("rtsp://%1:%2/%3").arg(ip, port, streamId);
+        return QString("rtsps://%1:%2/raw").arg(ip, port);
     }
 };
 
@@ -36,37 +35,35 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
-    void refreshVideoGrid();  // 외부에서 카메라 갱신 시 호출
+    void refreshVideoGrid();
 
 private slots:
     void onCameraListClicked();
     void onLogHistoryClicked();
-    void onPPEDetectorToggled(bool enabled);
-    void onMosaicerToggled(bool enabled);
+    void sendModeChangeRequest(const QString &mode, const CameraInfo &camera);
 
 private:
     void setupUI();
     void addLogEntry(const QString &camera, const QString &alert);
 
-    // 📷 카메라 관련
     QVector<CameraInfo> cameraList;
     QVector<QMediaPlayer*> players;
     QVector<QVideoWidget*> videoWidgets;
 
-    // 🖥️ UI 요소
-    QWidget* centralWidget;
-    QWidget* videoArea;                // ✅ 영상 그리드 컨테이너
-    QGridLayout* videoGridLayout;
-    QScrollArea* scrollArea;
-    QTableWidget* logTable;
+    QWidget *centralWidget;
+    QWidget *videoArea;
+    QGridLayout *videoGridLayout;
+    QScrollArea *scrollArea;
+    QTableWidget *logTable;
 
-    QPushButton* cameraListButton;
-    QCheckBox* ppeDetectorCheckBox;
-    QCheckBox* mosaicerCheckBox;
+    QPushButton *cameraListButton;
+    QCheckBox *rawCheckBox;
+    QCheckBox *blurCheckBox;
+    QCheckBox *ppeDetectorCheckBox;
 
-    // 기타
-    int currentCameraNumber;
-    CameraListDialog* cameraListDialog = nullptr;
+    CameraListDialog *cameraListDialog = nullptr;
+    QNetworkAccessManager *networkManager;
 };
 
 #endif // MAINWINDOW_H
+
