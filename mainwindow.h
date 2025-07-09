@@ -27,11 +27,20 @@ struct CameraInfo {
     }
 };
 
+// logentry.h 또는 mainwindow.h 내부 등 구조체 선언부에 아래처럼 추가
 struct LogEntry {
     QString camera;
+    QString function;   // 👈 명시적 필드 추가
     QString alert;
     QString imagePath;
+    QString details;
+    QString date;
+    QString time;
+    int zone;  // ✅ 실제 스트리밍 영역 번호
+    QString ip; // ✅ IP 필드 추가
+
 };
+
 
 class MainWindow : public QMainWindow
 {
@@ -52,7 +61,16 @@ private slots:
 
 private:
     void setupUI();
-    void addLogEntry(const QString &camera, const QString &alert, const QString &imagePath);
+    void addLogEntry(const CameraInfo &camera, const QString &event, const QString &imagePath, const QString &details);
+    void addLogEntry(const QString &cameraName, const QString &event,
+                     const QString &imagePath, const QString &details, const QString &ip);
+    void addLogEntry(const CameraInfo &camera, const QString &function, const QString &event, const QString &imagePath, const QString &details);  // ✅ 새 시그니처
+    void addLogEntry(const QString &cameraName,
+                     const QString &function,
+                     const QString &event,
+                     const QString &imagePath,
+                     const QString &details,
+                     const QString &ip);
 
     QVector<CameraInfo> cameraList;
     QVector<QMediaPlayer*> players;
@@ -71,8 +89,8 @@ private:
     QCheckBox *blurCheckBox;
     QCheckBox *ppeDetectorCheckBox;
 
-    QString lastPpeTimestamp;  // 최신 PPE 로그 시간
-    QString lastBlurTimestamp; // 최신 Blur 로그 시간 (추가해도 좋음)
+    QMap<QString, QString> lastPpeTimestamps;
+    QMap<QString, QString> lastBlurTimestamps;
 
     void switchStreamForAllPlayers(const QString &suffix);
 

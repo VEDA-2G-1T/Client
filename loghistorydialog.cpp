@@ -24,8 +24,10 @@ void LogHistoryDialog::setupUI()
     QLabel *titleLabel = new QLabel("Complete Safety Alerts");
     titleLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #ff8c00; margin-bottom: 10px;");
 
-    historyTable = new QTableWidget(0, 3);
-    historyTable->setHorizontalHeaderLabels(QStringList() << "Timestamp" << "Camera" << "Event");
+    historyTable = new QTableWidget(0, 7);
+    historyTable->setHorizontalHeaderLabels(QStringList()
+                                            << "Streaming Zone" << "Camera" << "Date" << "Time"
+                                            << "Function" << "Event" << "Details");
     historyTable->horizontalHeader()->setStretchLastSection(true);
     historyTable->setAlternatingRowColors(true);
     historyTable->verticalHeader()->setVisible(false);
@@ -96,13 +98,13 @@ void LogHistoryDialog::loadHistoryData()
         int row = historyTable->rowCount();
         historyTable->insertRow(row);
 
-        QString timestamp = "Unknown";
-        if (entry.alert.length() >= 19 && entry.alert[4].isDigit())
-            timestamp = entry.alert.left(19);
-
-        historyTable->setItem(row, 0, new QTableWidgetItem(timestamp));
-        historyTable->setItem(row, 1, new QTableWidgetItem(entry.camera));
-        historyTable->setItem(row, 2, new QTableWidgetItem(entry.alert));
+        historyTable->setItem(row, 0, new QTableWidgetItem(QString::number(entry.zone)));  // Streaming Zone
+        historyTable->setItem(row, 1, new QTableWidgetItem(entry.camera));                 // Camera
+        historyTable->setItem(row, 2, new QTableWidgetItem(entry.date));                   // Date
+        historyTable->setItem(row, 3, new QTableWidgetItem(entry.time));                   // Time
+        historyTable->setItem(row, 4, new QTableWidgetItem(entry.function));               // ✅ 고정된 Function 필드
+        historyTable->setItem(row, 5, new QTableWidgetItem(entry.alert));                  // Event
+        historyTable->setItem(row, 6, new QTableWidgetItem(entry.details));                // Details
     }
 
     historyTable->resizeColumnsToContents();
@@ -134,8 +136,12 @@ void LogHistoryDialog::onRowClicked(int row, int column)
     }
 
     // 이미지 요청 URL 생성
-    QString urlStr = QString("http://%1/%2").arg(ip, entry.imagePath);
-    QUrl url(urlStr);  // ✅ 이렇게 따로 분리해서 생성
+    QString cleanPath = entry.imagePath;
+    if (cleanPath.startsWith("./"))
+        cleanPath.remove(0, 2);  // "./" 제거
+
+    QString urlStr = QString("http://%1/%2").arg(entry.ip, cleanPath);  // ✅ entry.ip 필드 사용!
+    QUrl url(urlStr);
     QNetworkRequest request(url);
 
     QNetworkAccessManager *manager = new QNetworkAccessManager(this);
