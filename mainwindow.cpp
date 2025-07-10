@@ -20,7 +20,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     setupUI();
     setWindowTitle("Smart SafetyNet");
-    setMinimumSize(1000, 700);
+    setMinimumSize(1500, 800);
 
     networkManager = new QNetworkAccessManager(this);
 
@@ -92,7 +92,7 @@ void MainWindow::setupUI()
     QWidget *videoSection = new QWidget();
     videoSection->setLayout(videoLayout);
     videoSection->setFixedWidth(640);
-    videoSection->setStyleSheet("border: 1px solid red;");
+    // videoSection->setStyleSheet("border: 1px solid red;");
 
     QLabel *alertLabel = new QLabel("Alert");
     alertLabel->setStyleSheet("font-weight: bold; color: orange;");
@@ -122,7 +122,7 @@ void MainWindow::setupUI()
 
     QWidget *logSection = new QWidget();
     logSection->setLayout(logLayout);
-    logSection->setStyleSheet("border: 1px solid red;");
+    // logSection->setStyleSheet("border: 1px solid red;");
     logSection->setMinimumWidth(320);
 
     QPushButton *functionLabelButton = new QPushButton("Function");
@@ -132,7 +132,6 @@ void MainWindow::setupUI()
             background-color: transparent;
             color: orange;
             font-weight: bold;
-            border: 1px solid red;
         }
         QPushButton:hover {
             color: #ffae42;
@@ -247,7 +246,7 @@ void MainWindow::setupUI()
     QWidget *functionSection = new QWidget();
     functionSection->setLayout(functionLayout);
     functionSection->setFixedWidth(200);
-    functionSection->setStyleSheet("border: 1px solid red;");
+    // functionSection->setStyleSheet("border: 1px solid red;");
 
     QHBoxLayout *mainBodyLayout = new QHBoxLayout();
     mainBodyLayout->addWidget(videoSection);
@@ -342,7 +341,7 @@ void MainWindow::refreshVideoGrid()
         videoGridLayout->addWidget(videoFrame, i / columns, i % columns);
     }
 
-    // 모든 카메라가 삭제된 경우에만 체크박스 리셋
+    // ✅ 모든 카메라가 삭제된 경우: 체크박스 초기화
     if (cameraList.isEmpty()) {
         rawCheckBox->blockSignals(true);
         blurCheckBox->blockSignals(true);
@@ -355,6 +354,20 @@ void MainWindow::refreshVideoGrid()
         rawCheckBox->blockSignals(false);
         blurCheckBox->blockSignals(false);
         ppeDetectorCheckBox->blockSignals(false);
+    }
+
+    // ✅ 카메라가 있고 아무 모드도 선택 안되어 있을 경우 → Raw 적용
+    if (!cameraList.isEmpty() && !blurCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
+        rawCheckBox->blockSignals(true);
+        rawCheckBox->setChecked(true);
+        rawCheckBox->blockSignals(false);
+
+        for (const CameraInfo &camera : cameraList)
+            sendModeChangeRequest("raw", camera);
+
+        switchStreamForAllPlayers("raw");
+
+        addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
     }
 }
 
@@ -703,3 +716,4 @@ void MainWindow::onAlertItemClicked(int row, int column)
         imgDialog->exec();
     });
 }
+
