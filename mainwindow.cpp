@@ -106,9 +106,9 @@ void MainWindow::setupUI()
     logHeaderLayout->addWidget(logHistoryButton);
 
     logTable = new QTableWidget();
-    logTable->setColumnCount(3);
+    logTable->setColumnCount(5);
     logTable->setHorizontalHeaderLabels(
-        {"Camera Name", "Function", "Event"});
+        {"Camera Name", "Date", "Time", "Function", "Event"});
     logTable->horizontalHeader()->setStretchLastSection(true);
     logTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     logTable->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -145,21 +145,27 @@ void MainWindow::setupUI()
 
     // ✅ Raw 체크박스
     connect(rawCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
-        if (checked) {
-            blurCheckBox->blockSignals(true);
-            ppeDetectorCheckBox->blockSignals(true);
-            blurCheckBox->setChecked(false);
-            ppeDetectorCheckBox->setChecked(false);
-            blurCheckBox->blockSignals(false);
-            ppeDetectorCheckBox->blockSignals(false);
-
-            // 모든 카메라에 raw 모드 전송
-            for (const CameraInfo &camera : cameraList)
-                sendModeChangeRequest("raw", camera);
-
-            switchStreamForAllPlayers("raw");
-            addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
+        // ✅ Raw는 해제되지 않도록 강제 복원
+        if (!checked) {
+            rawCheckBox->blockSignals(true);
+            rawCheckBox->setChecked(true);
+            rawCheckBox->blockSignals(false);
+            return;
         }
+
+        // ✅ 나머지 모드는 해제하고 Raw 적용
+        blurCheckBox->blockSignals(true);
+        ppeDetectorCheckBox->blockSignals(true);
+        blurCheckBox->setChecked(false);
+        ppeDetectorCheckBox->setChecked(false);
+        blurCheckBox->blockSignals(false);
+        ppeDetectorCheckBox->blockSignals(false);
+
+        for (const CameraInfo &camera : cameraList)
+            sendModeChangeRequest("raw", camera);
+
+        switchStreamForAllPlayers("raw");
+        addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
     });
 
     // ✅ Blur 체크박스
@@ -180,13 +186,18 @@ void MainWindow::setupUI()
             addLogEntry("System", "Blur", "Blur mode enabled", "", "", "");
         } else {
             if (!rawCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
-                rawCheckBox->setChecked(true);
+                // ✅ 이미 Raw가 체크된 상태면 생략
+                if (!rawCheckBox->isChecked()) {
+                    rawCheckBox->blockSignals(true);
+                    rawCheckBox->setChecked(true);
+                    rawCheckBox->blockSignals(false);
 
-                for (const CameraInfo &camera : cameraList)
-                    sendModeChangeRequest("raw", camera);
+                    for (const CameraInfo &camera : cameraList)
+                        sendModeChangeRequest("raw", camera);
 
-                switchStreamForAllPlayers("raw");
-                addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
+                    switchStreamForAllPlayers("raw");
+                    addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
+                }
             }
         }
     });
@@ -208,14 +219,19 @@ void MainWindow::setupUI()
             switchStreamForAllPlayers("processed");
             addLogEntry("System", "PPE", "PPE Detector enabled", "", "", "");
         } else {
-            if (!rawCheckBox->isChecked() && !blurCheckBox->isChecked()) {
-                rawCheckBox->setChecked(true);
+            if (!rawCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
+                // ✅ 이미 Raw가 체크된 상태면 생략
+                if (!rawCheckBox->isChecked()) {
+                    rawCheckBox->blockSignals(true);
+                    rawCheckBox->setChecked(true);
+                    rawCheckBox->blockSignals(false);
 
-                for (const CameraInfo &camera : cameraList)
-                    sendModeChangeRequest("raw", camera);
+                    for (const CameraInfo &camera : cameraList)
+                        sendModeChangeRequest("raw", camera);
 
-                switchStreamForAllPlayers("raw");
-                addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
+                    switchStreamForAllPlayers("raw");
+                    addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
+                }
             }
         }
     });
@@ -348,8 +364,10 @@ void MainWindow::addLogEntry(const QString &cameraName, const QString &event,
 
     logTable->insertRow(0);
     logTable->setItem(0, 0, new QTableWidgetItem(cameraName));
-    logTable->setItem(0, 1, new QTableWidgetItem(function));
-    logTable->setItem(0, 2, new QTableWidgetItem(event));
+    logTable->setItem(0, 1, new QTableWidgetItem(date));  // ✅ Date
+    logTable->setItem(0, 2, new QTableWidgetItem(time));  // ✅ Time
+    logTable->setItem(0, 3, new QTableWidgetItem(function));
+    logTable->setItem(0, 4, new QTableWidgetItem(event));
 
     fullLogEntries.prepend({
         cameraName,
@@ -389,8 +407,10 @@ void MainWindow::addLogEntry(const CameraInfo &camera, const QString &function,
 
     logTable->insertRow(0);
     logTable->setItem(0, 0, new QTableWidgetItem(camera.name));
-    logTable->setItem(0, 1, new QTableWidgetItem(function));
-    logTable->setItem(0, 2, new QTableWidgetItem(event));
+    logTable->setItem(0, 1, new QTableWidgetItem(date));  // ✅ Date
+    logTable->setItem(0, 2, new QTableWidgetItem(time));  // ✅ Time
+    logTable->setItem(0, 3, new QTableWidgetItem(function));
+    logTable->setItem(0, 4, new QTableWidgetItem(event));
 
     fullLogEntries.prepend({
         camera.name,
@@ -421,8 +441,10 @@ void MainWindow::addLogEntry(const QString &cameraName,
 
     logTable->insertRow(0);
     logTable->setItem(0, 0, new QTableWidgetItem(cameraName));
-    logTable->setItem(0, 1, new QTableWidgetItem(function));
-    logTable->setItem(0, 2, new QTableWidgetItem(event));
+    logTable->setItem(0, 1, new QTableWidgetItem(date));  // ✅ Date
+    logTable->setItem(0, 2, new QTableWidgetItem(time));  // ✅ Time
+    logTable->setItem(0, 3, new QTableWidgetItem(function));
+    logTable->setItem(0, 4, new QTableWidgetItem(event));
 
     fullLogEntries.prepend({cameraName, function, event, imagePath, details, date, time, -1, ip});
 
