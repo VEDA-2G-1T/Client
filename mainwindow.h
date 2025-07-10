@@ -14,6 +14,7 @@
 #include <QMediaPlayer>
 #include <QVideoWidget>
 #include <QNetworkAccessManager>
+#include <QSet>  // ✅ 이 줄 추가!
 
 class CameraListDialog;
 
@@ -51,6 +52,9 @@ public:
     ~MainWindow();
 
     void refreshVideoGrid();
+    QSet<QString> recentBlurLogKeys;  // ✅ 중복 Blur 로그 방지용 키
+
+
 
 private slots:
     void onCameraListClicked();

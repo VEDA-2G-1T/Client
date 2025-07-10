@@ -276,6 +276,7 @@ void MainWindow::onCameraListClicked()
 
 void MainWindow::refreshVideoGrid()
 {
+    // 레이아웃 초기화
     QLayoutItem *child;
     while ((child = videoGridLayout->takeAt(0)) != nullptr) {
         if (child->widget())
@@ -283,6 +284,7 @@ void MainWindow::refreshVideoGrid()
         delete child;
     }
 
+    // 기존 플레이어 제거
     for (QMediaPlayer *player : players) {
         player->stop();
         delete player;
@@ -290,11 +292,19 @@ void MainWindow::refreshVideoGrid()
     players.clear();
     videoWidgets.clear();
 
+    // 화면 크기 조정
     int total = std::max(4, static_cast<int>(cameraList.size()));
     int columns = 2;
     int rows = (total + 1) / 2;
     videoArea->setMinimumSize(columns * 320, rows * 240);
 
+    // 현재 체크박스 상태 기준으로 스트림 suffix 결정
+    QString streamSuffix = "raw";
+    if (blurCheckBox->isChecked() || ppeDetectorCheckBox->isChecked()) {
+        streamSuffix = "processed";
+    }
+
+    // 카메라 별 영상 위젯 배치
     for (int i = 0; i < total; ++i) {
         QWidget *videoFrame = new QWidget();
         videoFrame->setFixedSize(320, 240);
@@ -312,7 +322,12 @@ void MainWindow::refreshVideoGrid()
 
             QMediaPlayer *player = new QMediaPlayer(this);
             player->setVideoOutput(vw);
-            player->setSource(QUrl(cameraList[i].rtspUrl()));
+
+            QString url = QString("rtsps://%1:%2/%3")
+                              .arg(cameraList[i].ip)
+                              .arg(cameraList[i].port)
+                              .arg(streamSuffix);
+            player->setSource(QUrl(url));
             player->play();
 
             players.append(player);
@@ -327,10 +342,7 @@ void MainWindow::refreshVideoGrid()
         videoGridLayout->addWidget(videoFrame, i / columns, i % columns);
     }
 
-    // ✅ 카메라가 있고 Blur/PPE가 선택 안되어 있을 때만 Raw 체크
-    if (!cameraList.isEmpty() && !blurCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
-        rawCheckBox->setChecked(true);
-    }
+    // 모든 카메라가 삭제된 경우에만 체크박스 리셋
     if (cameraList.isEmpty()) {
         rawCheckBox->blockSignals(true);
         blurCheckBox->blockSignals(true);
@@ -342,9 +354,10 @@ void MainWindow::refreshVideoGrid()
 
         rawCheckBox->blockSignals(false);
         blurCheckBox->blockSignals(false);
-        ppeDetectorCheckBox->blockSignals(false);        // ✅ 모든 카메라 삭제 시 모든 기능 체크 해제
+        ppeDetectorCheckBox->blockSignals(false);
     }
 }
+
 
 void MainWindow::addLogEntry(const QString &cameraName, const QString &event,
                              const QString &imagePath, const QString &details, const QString &ip)
@@ -592,18 +605,42 @@ void MainWindow::pollLogsFromServer()
             // ✅ Blur 로그 처리
             if (root.contains("person_counts")) {
                 QJsonArray arr = root["person_counts"].toArray();
+                qDebug() << "[DEBUG] Blur 응답 배열 크기:" << arr.size();
+
                 for (const QJsonValue &val : arr) {
                     QJsonObject obj = val.toObject();
                     QString ts = obj["timestamp"].toString();
+                    QString logKey = camera.name + "_" + ts;
 
-                    if (!lastBlurTimestamps[camera.name].isEmpty() &&
-                        ts <= lastBlurTimestamps[camera.name])
+                    if (recentBlurLogKeys.contains(logKey))
                         continue;
 
-                    QString event = QString("🔍 %1명 감지").arg(obj["count"].toInt());
-                    addLogEntry(camera, "Blur", event, "", "");
+                    int personCount = 0;
+                    if (obj["count"].isDouble()) {
+                        personCount = obj["count"].toInt();
+                    } else if (obj["count"].isString()) {
+                        personCount = obj["count"].toString().toInt();
+                    } else {
+                        qWarning() << "[Blur 로그] count 타입 이상 →" << obj["count"];
+                    }
 
-                    lastBlurTimestamps[camera.name] = ts;
+                    qDebug() << "[BLUR] 최종 personCount =" << personCount;
+
+
+                    // ✅ 0명 감지는 무시 (원하면 조건 제거 가능)
+                    if (personCount > 0) {
+                        recentBlurLogKeys.insert(logKey);
+                        if (recentBlurLogKeys.size() > 1000) {
+                            auto it = recentBlurLogKeys.begin();
+                            for (int i = 0; i < 200 && it != recentBlurLogKeys.end(); ++i)
+                                it = recentBlurLogKeys.erase(it);
+                        }
+
+                        QString event = QString("🔍 %1명 감지").arg(personCount);
+                        addLogEntry(camera, "Blur", event, "", "");
+                        lastBlurTimestamps[camera.name] = ts;
+                        break;  // 👉 유효한 로그 1개만 등록
+                    }
                 }
             }
         });
