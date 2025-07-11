@@ -80,6 +80,7 @@ private:
     QVector<QMediaPlayer*> players;
     QVector<QVideoWidget*> videoWidgets;
     QVector<LogEntry> fullLogEntries;
+    QMap<QString, QString> lastAnomalyStatus;  // 카메라 이름 -> 마지막 상태 ("detected"/"cleared")
 
     QWidget *centralWidget;
     QWidget *videoArea;
