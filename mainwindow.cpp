@@ -548,6 +548,150 @@ void MainWindow::pollLogsFromServer()
     if (cameraList.isEmpty()) return;
 
     for (const CameraInfo &camera : cameraList) {
+        //
+        // ✅ [1] 이상소음 감지 요청 (모드와 관계없이 항상 수행)
+        //
+        QString anomalyUrl = QString("http://%1/api/anomaly/status").arg(camera.ip);
+        QNetworkRequest anomalyRequest{QUrl(anomalyUrl)};
+        QNetworkReply *anomalyReply = networkManager->get(anomalyRequest);
+
+        connect(anomalyReply, &QNetworkReply::finished, this, [=]() {
+            anomalyReply->deleteLater();
+
+            if (anomalyReply->error() != QNetworkReply::NoError)
+                return;
+
+            QJsonDocument doc = QJsonDocument::fromJson(anomalyReply->readAll());
+            if (doc.isNull() || !doc.isObject())
+                return;
+
+            QString status = doc["status"].toString();
+            if (status == "detected" && lastAnomalyStatus[camera.name] != "detected") {
+                QString event = "⚠️ 이상소음 감지됨";
+                QString details = "이상소음이 감지되어 경고를 발생시킴";
+                addLogEntry(camera, "Sound", event, "", details);
+            }
+
+            lastAnomalyStatus[camera.name] = status;
+        });
+
+        //
+        // ✅ [2] PPE / Blur 감지 요청 (체크박스에 따라 조건적 수행)
+        //
+        QString baseUrl = QString("http://%1").arg(camera.ip);
+        QString endpoint;
+
+        if (ppeDetectorCheckBox->isChecked()) {
+            endpoint = "/api/detections";
+        } else if (blurCheckBox->isChecked()) {
+            endpoint = "/api/blur";
+        } else {
+            continue;  // PPE/Blur 요청 생략, 이상소음 요청은 이미 위에서 수행됨
+        }
+
+        QUrl url(baseUrl + endpoint);
+        QNetworkRequest request(url);
+        QNetworkReply *reply = networkManager->get(request);
+
+        connect(reply, &QNetworkReply::finished, this, [this, reply, camera]() {
+            QByteArray rawData = reply->readAll();
+            reply->deleteLater();
+
+            if (reply->error() != QNetworkReply::NoError)
+                return;
+
+            QJsonDocument doc = QJsonDocument::fromJson(rawData);
+            if (doc.isNull() || !doc.isObject()) return;
+
+            QJsonObject root = doc.object();
+            if (root["status"].toString() != "success") return;
+
+            // ✅ PPE 로그 처리
+            if (root.contains("detections")) {
+                QJsonArray arr = root["detections"].toArray();
+                for (const QJsonValue &val : arr) {
+                    QJsonObject obj = val.toObject();
+                    QString ts = obj["timestamp"].toString();
+
+                    if (!lastPpeTimestamps[camera.name].isEmpty() &&
+                        ts <= lastPpeTimestamps[camera.name])
+                        continue;
+
+                    int personCount = obj["person_count"].toInt();
+                    int helmetCount = obj["helmet_count"].toInt();
+                    int vestCount = obj["safety_vest_count"].toInt();
+                    double confidence = obj["avg_confidence"].toDouble();
+
+                    QString event;
+                    if (helmetCount == vestCount && personCount <= helmetCount)
+                        return;
+                    else if (helmetCount < vestCount)
+                        event = "⛑️ 헬멧 미착용 감지";
+                    else if (helmetCount > vestCount)
+                        event = "🦺 조끼 미착용 감지";
+                    else
+                        event = "⛑️ 🦺 PPE 미착용 감지";
+
+                    QString detail = QString("👷 %1명 | ⛑️ %2명 | 🦺 %3명 | 신뢰도: %4")
+                                         .arg(personCount)
+                                         .arg(helmetCount)
+                                         .arg(vestCount)
+                                         .arg(confidence, 0, 'f', 2);
+
+                    QString imgPath = obj["image_path"].toString();
+                    addLogEntry(camera.name, event, imgPath, detail, camera.ip);
+
+                    lastPpeTimestamps[camera.name] = ts;
+                }
+            }
+
+            // ✅ Blur 로그 처리
+            if (root.contains("person_counts")) {
+                QJsonArray arr = root["person_counts"].toArray();
+
+                for (const QJsonValue &val : arr) {
+                    QJsonObject obj = val.toObject();
+                    QString ts = obj["timestamp"].toString();
+                    QString logKey = camera.name + "_" + ts;
+
+                    if (recentBlurLogKeys.contains(logKey))
+                        continue;
+
+                    int personCount = 0;
+                    if (obj["count"].isDouble()) {
+                        personCount = obj["count"].toInt();
+                    } else if (obj["count"].isString()) {
+                        personCount = obj["count"].toString().toInt();
+                    } else {
+                        qWarning() << "[Blur 로그] count 타입 이상 →" << obj["count"];
+                    }
+
+                    if (personCount > 0) {
+                        recentBlurLogKeys.insert(logKey);
+                        if (recentBlurLogKeys.size() > 1000) {
+                            auto it = recentBlurLogKeys.begin();
+                            for (int i = 0; i < 200 && it != recentBlurLogKeys.end(); ++i)
+                                it = recentBlurLogKeys.erase(it);
+                        }
+
+                        QString event = QString("🔍 %1명 감지").arg(personCount);
+                        addLogEntry(camera, "Blur", event, "", "");
+                        lastBlurTimestamps[camera.name] = ts;
+                        break;  // 👉 유효한 로그 1개만 등록
+                    }
+                }
+            }
+        });
+    }
+}
+
+
+/*
+void MainWindow::pollLogsFromServer()
+{
+    if (cameraList.isEmpty()) return;
+
+    for (const CameraInfo &camera : cameraList) {
         QString baseUrl = QString("http://%1").arg(camera.ip);
 
         QString endpoint;
@@ -657,8 +801,34 @@ void MainWindow::pollLogsFromServer()
                 }
             }
         });
+
+        // 이상소음 감지 요청
+        QString anomalyUrl = QString("http://%1/api/anomaly/status").arg(camera.ip);
+        QNetworkRequest anomalyRequest{QUrl(anomalyUrl)};
+        QNetworkReply *anomalyReply = networkManager->get(anomalyRequest);
+
+        connect(anomalyReply, &QNetworkReply::finished, this, [=]() {
+            anomalyReply->deleteLater();
+
+            if (anomalyReply->error() != QNetworkReply::NoError)
+                return;
+
+            QJsonDocument doc = QJsonDocument::fromJson(anomalyReply->readAll());
+            if (doc.isNull() || !doc.isObject())
+                return;
+
+            QString status = doc["status"].toString();
+            if (status == "detected") {
+                QString event = "⚠️ 이상소음 감지됨";
+                QString details = "이상소음이 감지되어 경고를 발생시킴";
+                addLogEntry(camera, "Sound", event, "", details);
+            }
+
+            lastAnomalyStatus[camera.name] = status;
+        });
+
     }
-}
+}*/
 
 
 void MainWindow::onAlertItemClicked(int row, int column)
