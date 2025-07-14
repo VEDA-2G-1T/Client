@@ -2,18 +2,28 @@
 #include "cameralistdialog.h"
 #include "loghistorydialog.h"
 
+// UI 관련 위젯
 #include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QScrollArea>
+
+// 알림창
 #include <QMessageBox>
+
 #include <QHeaderView>
+
+// JSON 데이터 파싱용
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QNetworkReply>
-#include <QTimer>
 #include <QJsonArray>
+
+// 네트워크 요청 처리
+#include <QNetworkReply>
+
+// 주기적인 작업용
+#include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -22,12 +32,15 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowTitle("Smart SafetyNet");
     setMinimumSize(1500, 800);
 
+    // REST API 통신용
     networkManager = new QNetworkAccessManager(this);
 
+    // 2초마다 서버로부터 로그 데이터 폴링(비동기 연결)
     QTimer *logTimer = new QTimer(this);
-    connect(logTimer, &QTimer::timeout, this, &MainWindow::pollLogsFromServer);
-    logTimer->start(2000);
+    connect(logTimer, &QTimer::timeout, this, &MainWindow::pollLogsFromServer); // 타이머에 pollLogsFromServer()슬롯 연결
+    logTimer->start(2000); // 2초마다 동작
 
+    // mainwindow의 스타일 시트 설정 : 전체 윈도우 스타일에 적용 - 다크모드, 버튼/테이블/라벨 전체 통일 디자인
     setStyleSheet(R"(
         QWidget { background-color: #2b2b2b; color: white; }
         QLabel { color: white; }
@@ -47,11 +60,15 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow() {}
 
+/*
 void MainWindow::setupUI()
 {
+    // centralWidget : 모든 레이아웃과 위젯이 배치되는 곳
+    // QMinWindow에는 반드시 하나의 centralWidget이 있어야 함
     centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
 
+    // Top Bar : 상단 바 - 인사말 + 종료 버튼
     QLabel *greetingLabel = new QLabel("Hello admin!");
     greetingLabel->setStyleSheet("font-size: 20px; font-weight: bold;");
 
@@ -63,6 +80,7 @@ void MainWindow::setupUI()
     topLayout->addStretch();
     topLayout->addWidget(exitButton);
 
+    // 영상 스트리밍 영역 헤더
     QLabel *streamingLabel = new QLabel("Video Streaming");
     streamingLabel->setStyleSheet("font-weight: bold; color: orange;");
 
@@ -74,6 +92,7 @@ void MainWindow::setupUI()
     streamingHeaderLayout->addStretch();
     streamingHeaderLayout->addWidget(cameraListButton);
 
+    // 영상 스트리밍 Grid + Scroll Area
     videoArea = new QWidget();
     videoGridLayout = new QGridLayout(videoArea);
     videoGridLayout->setContentsMargins(0, 0, 0, 0);
@@ -83,15 +102,16 @@ void MainWindow::setupUI()
     scrollArea = new QScrollArea();
     scrollArea->setWidgetResizable(true);
     scrollArea->setWidget(videoArea);
-    scrollArea->setFixedWidth(2 * 320 + 3);
+    scrollArea->setFixedWidth(2 * 320 + 10);
 
+    // 영상 섹션
     QVBoxLayout *videoLayout = new QVBoxLayout();
     videoLayout->addLayout(streamingHeaderLayout);
     videoLayout->addWidget(scrollArea);
 
     QWidget *videoSection = new QWidget();
     videoSection->setLayout(videoLayout);
-    videoSection->setFixedWidth(640);
+    videoSection->setFixedWidth(660);
     // videoSection->setStyleSheet("border: 1px solid red;");
 
     QLabel *alertLabel = new QLabel("Alert");
@@ -259,116 +279,138 @@ void MainWindow::setupUI()
 
     refreshVideoGrid();
 }
+*/
 
-void MainWindow::onCameraListClicked()
-{
-    if (!cameraListDialog) {
-        cameraListDialog = new CameraListDialog(this, &cameraList);
-        connect(cameraListDialog, &CameraListDialog::cameraListUpdated, this, &MainWindow::refreshVideoGrid);
-    }
+void MainWindow::setupUI() {
+    centralWidget = new QWidget(this);
+    setCentralWidget(centralWidget);
 
-    cameraListDialog->refreshTable();
-    cameraListDialog->show();
-    cameraListDialog->raise();
-    cameraListDialog->activateWindow();
+    setupTopBar();
+    setupVideoSection();
+    setupLogSection();
+    setupFunctionPanel();
+    setupMainLayout();
+
+    refreshVideoGrid();
 }
 
-void MainWindow::refreshVideoGrid()
-{
-    // 레이아웃 초기화
-    QLayoutItem *child;
-    while ((child = videoGridLayout->takeAt(0)) != nullptr) {
-        if (child->widget())
-            child->widget()->deleteLater();
-        delete child;
-    }
+void MainWindow::setupTopBar() {
+    QLabel *greetingLabel = new QLabel("Hello admin!");
+    greetingLabel->setStyleSheet("font-size: 20px; font-weight: bold;");
 
-    // 기존 플레이어 제거
-    for (QMediaPlayer *player : players) {
-        player->stop();
-        delete player;
-    }
-    players.clear();
-    videoWidgets.clear();
+    QPushButton *exitButton = new QPushButton("종료");
+    connect(exitButton, &QPushButton::clicked, this, &MainWindow::close);
 
-    // 화면 크기 조정
-    int total = std::max(4, static_cast<int>(cameraList.size()));
-    int columns = 2;
-    int rows = (total + 1) / 2;
-    videoArea->setMinimumSize(columns * 320, rows * 240);
+    topLayout = new QHBoxLayout();
+    topLayout->addWidget(greetingLabel);
+    topLayout->addStretch();
+    topLayout->addWidget(exitButton);
+}
 
-    // 현재 체크박스 상태 기준으로 스트림 suffix 결정
-    QString streamSuffix = "raw";
-    if (blurCheckBox->isChecked() || ppeDetectorCheckBox->isChecked()) {
-        streamSuffix = "processed";
-    }
+void MainWindow::setupVideoSection() {
+    QLabel *streamingLabel = new QLabel("Video Streaming");
+    streamingLabel->setStyleSheet("font-weight: bold; color: orange;");
 
-    // 카메라 별 영상 위젯 배치
-    for (int i = 0; i < total; ++i) {
-        QWidget *videoFrame = new QWidget();
-        videoFrame->setFixedSize(320, 240);
-        videoFrame->setStyleSheet("background-color: black; border: 1px solid #555;");
+    cameraListButton = new QPushButton("카메라 리스트");
+    connect(cameraListButton, &QPushButton::clicked, this, &MainWindow::onCameraListClicked);
 
-        if (i < cameraList.size()) {
-            QLabel *nameLabel = new QLabel(cameraList[i].name, videoFrame);
-            nameLabel->setStyleSheet("color: white; font-weight: bold; background-color: rgba(0,0,0,100); padding: 2px;");
-            nameLabel->move(5, 5);
-            nameLabel->show();
+    QHBoxLayout *streamingHeaderLayout = new QHBoxLayout();
+    streamingHeaderLayout->addWidget(streamingLabel);
+    streamingHeaderLayout->addStretch();
+    streamingHeaderLayout->addWidget(cameraListButton);
 
-            QVideoWidget *vw = new QVideoWidget(videoFrame);
-            vw->setGeometry(0, 0, 320, 240);
-            vw->lower();
+    videoArea = new QWidget();
+    videoGridLayout = new QGridLayout(videoArea);
+    videoGridLayout->setContentsMargins(0, 0, 0, 0);
+    videoGridLayout->setSpacing(1);
+    videoGridLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
 
-            QMediaPlayer *player = new QMediaPlayer(this);
-            player->setVideoOutput(vw);
+    scrollArea = new QScrollArea();
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setWidget(videoArea);
+    scrollArea->setFixedWidth(2 * 320 + 3);
 
-            QString url = QString("rtsps://%1:%2/%3")
-                              .arg(cameraList[i].ip)
-                              .arg(cameraList[i].port)
-                              .arg(streamSuffix);
-            player->setSource(QUrl(url));
-            player->play();
+    QVBoxLayout *videoLayout = new QVBoxLayout();
+    videoLayout->addLayout(streamingHeaderLayout);
+    videoLayout->addWidget(scrollArea);
 
-            players.append(player);
-            videoWidgets.append(vw);
-        } else {
-            QLabel *noCam = new QLabel("No Camera", videoFrame);
-            noCam->setAlignment(Qt::AlignCenter);
-            noCam->setGeometry(0, 0, 320, 240);
-            noCam->setStyleSheet("color: white;");
+    videoSection = new QWidget();
+    videoSection->setLayout(videoLayout);
+    videoSection->setFixedWidth(640);
+}
+
+void MainWindow::setupLogSection() {
+    QLabel *alertLabel = new QLabel("Alert");
+    alertLabel->setStyleSheet("font-weight: bold; color: orange;");
+
+    QPushButton *logHistoryButton = new QPushButton("전체 로그 보기");
+    connect(logHistoryButton, &QPushButton::clicked, this, &MainWindow::onLogHistoryClicked);
+
+    QHBoxLayout *logHeaderLayout = new QHBoxLayout();
+    logHeaderLayout->addWidget(alertLabel);
+    logHeaderLayout->addStretch();
+    logHeaderLayout->addWidget(logHistoryButton);
+
+    logTable = new QTableWidget();
+    logTable->setColumnCount(5);
+    logTable->setHorizontalHeaderLabels({"Camera Name", "Date", "Time", "Function", "Event"});
+    logTable->horizontalHeader()->setStretchLastSection(true);
+    logTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    logTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    logTable->verticalHeader()->setVisible(false);
+
+    connect(logTable, &QTableWidget::cellClicked, this, &MainWindow::onAlertItemClicked);
+
+    QVBoxLayout *logLayout = new QVBoxLayout();
+    logLayout->addLayout(logHeaderLayout);
+    logLayout->addWidget(logTable);
+
+    logSection = new QWidget();
+    logSection->setLayout(logLayout);
+    logSection->setMinimumWidth(320);
+}
+
+void MainWindow::setupFunctionPanel() {
+    QPushButton *functionLabelButton = new QPushButton("Function");
+    functionLabelButton->setFlat(true);
+    functionLabelButton->setStyleSheet(R"(
+        QPushButton {
+            background-color: transparent;
+            color: orange;
+            font-weight: bold;
         }
+        QPushButton:hover {
+            color: #ffae42;
+        }
+    )");
 
-        videoGridLayout->addWidget(videoFrame, i / columns, i % columns);
-    }
+    rawCheckBox = new QCheckBox("Raw");
+    blurCheckBox = new QCheckBox("Blur");
+    ppeDetectorCheckBox = new QCheckBox("PPE Detector");
 
-    // ✅ 모든 카메라가 삭제된 경우: 체크박스 초기화
-    if (cameraList.isEmpty()) {
-        rawCheckBox->blockSignals(true);
-        blurCheckBox->blockSignals(true);
-        ppeDetectorCheckBox->blockSignals(true);
+    // 👉 여기에 기존의 connect 코드들 유지하면 됨
 
-        rawCheckBox->setChecked(false);
-        blurCheckBox->setChecked(false);
-        ppeDetectorCheckBox->setChecked(false);
+    QVBoxLayout *functionLayout = new QVBoxLayout();
+    functionLayout->addWidget(functionLabelButton);
+    functionLayout->addWidget(rawCheckBox);
+    functionLayout->addWidget(blurCheckBox);
+    functionLayout->addWidget(ppeDetectorCheckBox);
+    functionLayout->addStretch();
 
-        rawCheckBox->blockSignals(false);
-        blurCheckBox->blockSignals(false);
-        ppeDetectorCheckBox->blockSignals(false);
-    }
+    functionSection = new QWidget();
+    functionSection->setLayout(functionLayout);
+    functionSection->setFixedWidth(200);
+}
 
-    // ✅ 카메라가 있고 아무 모드도 선택 안되어 있을 경우 → Raw 적용
-    if (!cameraList.isEmpty() && !blurCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
-        rawCheckBox->blockSignals(true);
-        rawCheckBox->setChecked(true);
-        rawCheckBox->blockSignals(false);
+void MainWindow::setupMainLayout() {
+    QHBoxLayout *mainBodyLayout = new QHBoxLayout();
+    mainBodyLayout->addWidget(videoSection);
+    mainBodyLayout->addWidget(logSection);
+    mainBodyLayout->addWidget(functionSection);
 
-        for (const CameraInfo &camera : cameraList)
-            sendModeChangeRequest("raw", camera);
-
-        switchStreamForAllPlayers("raw");
-
-        addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
-    }
+    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+    mainLayout->addLayout(topLayout);
+    mainLayout->addLayout(mainBodyLayout);
 }
 
 
@@ -685,152 +727,6 @@ void MainWindow::pollLogsFromServer()
     }
 }
 
-
-/*
-void MainWindow::pollLogsFromServer()
-{
-    if (cameraList.isEmpty()) return;
-
-    for (const CameraInfo &camera : cameraList) {
-        QString baseUrl = QString("http://%1").arg(camera.ip);
-
-        QString endpoint;
-        if (ppeDetectorCheckBox->isChecked()) {
-            endpoint = "/api/detections";
-        } else if (blurCheckBox->isChecked()) {
-            endpoint = "/api/blur";
-        } else {
-            continue;
-        }
-
-        QUrl url(baseUrl + endpoint);
-        QNetworkRequest request(url);
-        QNetworkReply *reply = networkManager->get(request);
-
-        connect(reply, &QNetworkReply::finished, this, [this, reply, camera]() {
-            QByteArray rawData = reply->readAll();
-            reply->deleteLater();
-
-            if (reply->error() != QNetworkReply::NoError)
-                return;
-
-            QJsonDocument doc = QJsonDocument::fromJson(rawData);
-            if (doc.isNull() || !doc.isObject()) return;
-
-            QJsonObject root = doc.object();
-            if (root["status"].toString() != "success") return;
-
-            // ✅ PPE 로그 처리
-            if (root.contains("detections")) {
-                QJsonArray arr = root["detections"].toArray();
-                for (const QJsonValue &val : arr) {
-                    QJsonObject obj = val.toObject();
-                    QString ts = obj["timestamp"].toString();
-
-                    if (!lastPpeTimestamps[camera.name].isEmpty() &&
-                        ts <= lastPpeTimestamps[camera.name])
-                        continue;
-
-                    int personCount = obj["person_count"].toInt();
-                    int helmetCount = obj["helmet_count"].toInt();
-                    int vestCount = obj["safety_vest_count"].toInt();
-                    double confidence = obj["avg_confidence"].toDouble();
-
-                    QString event;
-                    if (helmetCount == vestCount && personCount <= helmetCount)
-                        return;
-                    else if (helmetCount < vestCount)
-                        event = "⛑️ 헬멧 미착용 감지";
-                    else if (helmetCount > vestCount)
-                        event = "🦺 조끼 미착용 감지";
-                    else
-                        event = "⛑️ 🦺 PPE 미착용 감지";
-
-                    QString detail = QString("👷 %1명 | ⛑️ %2명 | 🦺 %3명 | 신뢰도: %4")
-                                         .arg(personCount)
-                                         .arg(helmetCount)
-                                         .arg(vestCount)
-                                         .arg(confidence, 0, 'f', 2);
-
-                    QString imgPath = obj["image_path"].toString();
-                    addLogEntry(camera.name, event, imgPath, detail, camera.ip);
-
-                    lastPpeTimestamps[camera.name] = ts;
-                }
-            }
-
-            // ✅ Blur 로그 처리
-            if (root.contains("person_counts")) {
-                QJsonArray arr = root["person_counts"].toArray();
-                qDebug() << "[DEBUG] Blur 응답 배열 크기:" << arr.size();
-
-                for (const QJsonValue &val : arr) {
-                    QJsonObject obj = val.toObject();
-                    QString ts = obj["timestamp"].toString();
-                    QString logKey = camera.name + "_" + ts;
-
-                    if (recentBlurLogKeys.contains(logKey))
-                        continue;
-
-                    int personCount = 0;
-                    if (obj["count"].isDouble()) {
-                        personCount = obj["count"].toInt();
-                    } else if (obj["count"].isString()) {
-                        personCount = obj["count"].toString().toInt();
-                    } else {
-                        qWarning() << "[Blur 로그] count 타입 이상 →" << obj["count"];
-                    }
-
-                    qDebug() << "[BLUR] 최종 personCount =" << personCount;
-
-
-                    // ✅ 0명 감지는 무시 (원하면 조건 제거 가능)
-                    if (personCount > 0) {
-                        recentBlurLogKeys.insert(logKey);
-                        if (recentBlurLogKeys.size() > 1000) {
-                            auto it = recentBlurLogKeys.begin();
-                            for (int i = 0; i < 200 && it != recentBlurLogKeys.end(); ++i)
-                                it = recentBlurLogKeys.erase(it);
-                        }
-
-                        QString event = QString("🔍 %1명 감지").arg(personCount);
-                        addLogEntry(camera, "Blur", event, "", "");
-                        lastBlurTimestamps[camera.name] = ts;
-                        break;  // 👉 유효한 로그 1개만 등록
-                    }
-                }
-            }
-        });
-
-        // 이상소음 감지 요청
-        QString anomalyUrl = QString("http://%1/api/anomaly/status").arg(camera.ip);
-        QNetworkRequest anomalyRequest{QUrl(anomalyUrl)};
-        QNetworkReply *anomalyReply = networkManager->get(anomalyRequest);
-
-        connect(anomalyReply, &QNetworkReply::finished, this, [=]() {
-            anomalyReply->deleteLater();
-
-            if (anomalyReply->error() != QNetworkReply::NoError)
-                return;
-
-            QJsonDocument doc = QJsonDocument::fromJson(anomalyReply->readAll());
-            if (doc.isNull() || !doc.isObject())
-                return;
-
-            QString status = doc["status"].toString();
-            if (status == "detected") {
-                QString event = "⚠️ 이상소음 감지됨";
-                QString details = "이상소음이 감지되어 경고를 발생시킴";
-                addLogEntry(camera, "Sound", event, "", details);
-            }
-
-            lastAnomalyStatus[camera.name] = status;
-        });
-
-    }
-}*/
-
-
 void MainWindow::onAlertItemClicked(int row, int column)
 {
     if (row >= fullLogEntries.size()) return;
@@ -887,3 +783,113 @@ void MainWindow::onAlertItemClicked(int row, int column)
     });
 }
 
+void MainWindow::onCameraListClicked()
+{
+    if (!cameraListDialog) {
+        cameraListDialog = new CameraListDialog(this, &cameraList);
+        connect(cameraListDialog, &CameraListDialog::cameraListUpdated, this, &MainWindow::refreshVideoGrid);
+    }
+
+    cameraListDialog->refreshTable();
+    cameraListDialog->show();
+    cameraListDialog->raise();
+    cameraListDialog->activateWindow();
+}
+
+void MainWindow::refreshVideoGrid()
+{
+    // 레이아웃 초기화
+    QLayoutItem *child;
+    while ((child = videoGridLayout->takeAt(0)) != nullptr) {
+        if (child->widget())
+            child->widget()->deleteLater();
+        delete child;
+    }
+
+    // 기존 플레이어 제거
+    for (QMediaPlayer *player : players) {
+        player->stop();
+        delete player;
+    }
+    players.clear();
+    videoWidgets.clear();
+
+    // 화면 크기 조정
+    int total = std::max(4, static_cast<int>(cameraList.size()));
+    int columns = 2;
+    int rows = (total + 1) / 2;
+    videoArea->setMinimumSize(columns * 320, rows * 240);
+
+    // 현재 체크박스 상태 기준으로 스트림 suffix 결정
+    QString streamSuffix = "raw";
+    if (blurCheckBox->isChecked() || ppeDetectorCheckBox->isChecked()) {
+        streamSuffix = "processed";
+    }
+
+    // 카메라 별 영상 위젯 배치
+    for (int i = 0; i < total; ++i) {
+        QWidget *videoFrame = new QWidget();
+        videoFrame->setFixedSize(320, 240);
+        videoFrame->setStyleSheet("background-color: black; border: 1px solid #555;");
+
+        if (i < cameraList.size()) {
+            QLabel *nameLabel = new QLabel(cameraList[i].name, videoFrame);
+            nameLabel->setStyleSheet("color: white; font-weight: bold; background-color: rgba(0,0,0,100); padding: 2px;");
+            nameLabel->move(5, 5);
+            nameLabel->show();
+
+            QVideoWidget *vw = new QVideoWidget(videoFrame);
+            vw->setGeometry(0, 0, 320, 240);
+            vw->lower();
+
+            QMediaPlayer *player = new QMediaPlayer(this);
+            player->setVideoOutput(vw);
+
+            QString url = QString("rtsps://%1:%2/%3")
+                              .arg(cameraList[i].ip)
+                              .arg(cameraList[i].port)
+                              .arg(streamSuffix);
+            player->setSource(QUrl(url));
+            player->play();
+
+            players.append(player);
+            videoWidgets.append(vw);
+        } else {
+            QLabel *noCam = new QLabel("No Camera", videoFrame);
+            noCam->setAlignment(Qt::AlignCenter);
+            noCam->setGeometry(0, 0, 320, 240);
+            noCam->setStyleSheet("color: white;");
+        }
+
+        videoGridLayout->addWidget(videoFrame, i / columns, i % columns);
+    }
+
+    // ✅ 모든 카메라가 삭제된 경우: 체크박스 초기화
+    if (cameraList.isEmpty()) {
+        rawCheckBox->blockSignals(true);
+        blurCheckBox->blockSignals(true);
+        ppeDetectorCheckBox->blockSignals(true);
+
+        rawCheckBox->setChecked(false);
+        blurCheckBox->setChecked(false);
+        ppeDetectorCheckBox->setChecked(false);
+
+        rawCheckBox->blockSignals(false);
+        blurCheckBox->blockSignals(false);
+        ppeDetectorCheckBox->blockSignals(false);
+    }
+
+    // ✅ 카메라가 있고 아무 모드도 선택 안되어 있을 경우 → Raw 적용
+    if (!cameraList.isEmpty() && !blurCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
+        rawCheckBox->blockSignals(true);
+        rawCheckBox->setChecked(true);
+        rawCheckBox->blockSignals(false);
+
+        for (const CameraInfo &camera : cameraList)
+            sendModeChangeRequest("raw", camera);
+
+        switchStreamForAllPlayers("raw");
+
+        addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
+    }
+}

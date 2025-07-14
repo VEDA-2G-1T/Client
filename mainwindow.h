@@ -65,6 +65,12 @@ private slots:
 
 private:
     void setupUI();
+    void setupTopBar();
+    void setupVideoSection();
+    void setupLogSection();
+    void setupFunctionPanel();
+    void setupMainLayout();
+
     void addLogEntry(const CameraInfo &camera, const QString &event, const QString &imagePath, const QString &details);
     void addLogEntry(const QString &cameraName, const QString &event,
                      const QString &imagePath, const QString &details, const QString &ip);
@@ -75,6 +81,11 @@ private:
                      const QString &imagePath,
                      const QString &details,
                      const QString &ip);
+
+    QHBoxLayout *topLayout;
+    QWidget *videoSection;
+    QWidget *logSection;
+    QWidget *functionSection;
 
     QVector<CameraInfo> cameraList;
     QVector<QMediaPlayer*> players;

@@ -110,6 +110,7 @@ void LoginWindow::onLoginClicked()
     if (username == "admin" && password == "admin") {
         mainWindow = new MainWindow();
         mainWindow->show();
+        qDebug() << "MainWindow opened.";
         this->hide();
     } else {
         QMessageBox::warning(this, "Login Failed", "Invalid username or password!");
