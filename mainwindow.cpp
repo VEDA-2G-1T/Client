@@ -875,56 +875,6 @@ void MainWindow::onSocketDisconnected() {
 void MainWindow::onSocketErrorOccurred(QAbstractSocket::SocketError error) {
     qDebug() << "[웹소켓 오류]" << error;
 }
-/*
-void MainWindow::loadInitialLogs()
-{
-    fullLogEntries.clear();  // 기존 로그 초기화
-
-    for (const CameraInfo &camera : cameraList) {
-        QString urlStr = QString("http://%1/api/logs").arg(camera.ip);
-        QNetworkRequest request{QUrl(urlStr)};
-        QNetworkReply *reply = networkManager->get(request);
-
-        connect(reply, &QNetworkReply::finished, this, [=]() {
-            reply->deleteLater();
-            if (reply->error() != QNetworkReply::NoError) {
-                qWarning() << "[초기 로그 로딩 실패]" << camera.name << reply->errorString();
-                return;
-            }
-
-            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-
-            qDebug() << "[요청 URL]" << urlStr;
-            qDebug() << "[응답 JSON]" << doc;
-
-            if (!doc.isArray()) {
-                qWarning() << "[초기 로그 응답 형식 이상]" << camera.name;
-                return;
-            }
-
-            QJsonArray arr = doc.array();
-            for (const QJsonValue &val : arr) {
-                QJsonObject obj = val.toObject();
-
-                LogEntry entry;
-                entry.camera = camera.name;
-                entry.function = obj["function"].toString();
-                entry.alert = obj["event"].toString();
-                entry.imagePath = obj["image_path"].toString();
-                entry.details = obj["details"].toString();
-                entry.date = obj["date"].toString();
-                entry.time = obj["time"].toString();
-                entry.zone = cameraList.indexOf(camera) + 1;
-                entry.ip = camera.ip;
-
-                fullLogEntries.append(entry);
-            }
-
-            qDebug() << "[초기 로그 로딩 완료]:" << arr.size() << "개 from" << camera.name;
-        });
-    }
-}
-*/
 
 void MainWindow::loadInitialLogs()
 {
@@ -967,51 +917,5 @@ void MainWindow::loadInitialLogs()
                 });
             }
         });
-        /*
-        // (2) Blur 로그 요청
-        QString urlBlur = QString("http://%1/api/blur").arg(camera.ip);
-        QNetworkRequest reqBlur{QUrl(urlBlur)};
-        QNetworkReply *replyBlur = networkManager->get(reqBlur);
-        connect(replyBlur, &QNetworkReply::finished, this, [=]() {
-            replyBlur->deleteLater();
-            if (replyBlur->error() != QNetworkReply::NoError) return;
-
-            QJsonDocument doc = QJsonDocument::fromJson(replyBlur->readAll());
-            QJsonArray arr = doc["person_counts"].toArray();
-            for (const QJsonValue &val : arr) {
-                QJsonObject obj = val.toObject();
-                int count = obj["count"].toInt();
-                QString ts = obj["timestamp"].toString();
-
-                QString event = QString("🔍 %1명 감지").arg(count);
-                fullLogEntries.append({
-                    camera.name, "Blur", event, "", "",
-                    ts.left(10), ts.mid(11, 8),
-                    cameraList.indexOf(camera) + 1, camera.ip
-                });
-            }
-        });
-
-        // (3) 이상소음 상태 요청
-        QString urlAnomaly = QString("http://%1/api/anomaly/status").arg(camera.ip);
-        QNetworkRequest reqAnomaly{QUrl(urlAnomaly)};
-        QNetworkReply *replyAnomaly = networkManager->get(reqAnomaly);
-        connect(replyAnomaly, &QNetworkReply::finished, this, [=]() {
-            replyAnomaly->deleteLater();
-            if (replyAnomaly->error() != QNetworkReply::NoError) return;
-
-            QJsonDocument doc = QJsonDocument::fromJson(replyAnomaly->readAll());
-            QString status = doc["status"].toString();
-            QString ts = doc["timestamp"].toString();
-
-            if (status == "detected") {
-                fullLogEntries.append({
-                    camera.name, "Sound", "⚠️ 이상소음 감지됨", "", "이상소음이 감지되었습니다.",
-                    ts.left(10), ts.mid(11, 8),
-                    cameraList.indexOf(camera) + 1, camera.ip
-                });
-            }
-        });
-    */
     }
 }
