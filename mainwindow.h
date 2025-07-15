@@ -28,6 +28,10 @@ struct CameraInfo {
     QString rtspUrl() const {
         return QString("rtsps://%1:%2/raw").arg(ip, port);
     }
+
+    bool operator==(const CameraInfo &other) const {
+        return name == other.name && ip == other.ip && port == other.port;
+    }
 };
 
 // logentry.h 또는 mainwindow.h 내부 등 구조체 선언부에 아래처럼 추가
@@ -83,7 +87,7 @@ private:
                      const QString &imagePath,
                      const QString &details,
                      const QString &ip);
-
+    void loadInitialLogs();  // ← private: 섹션에 선언
 
     QHBoxLayout *topLayout;
     QWidget *videoSection;
