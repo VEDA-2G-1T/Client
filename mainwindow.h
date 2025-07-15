@@ -84,18 +84,17 @@ private:
                      const QString &details,
                      const QString &ip);
 
-<<<<<<< HEAD
+
     QHBoxLayout *topLayout;
     QWidget *videoSection;
     QWidget *logSection;
     QWidget *functionSection;
-=======
+
     void setupWebSocketConnections();
     void onSocketConnected();
     void onSocketDisconnected();
     void onSocketMessageReceived(const QString &message);
     void onSocketErrorOccurred(QAbstractSocket::SocketError error);
->>>>>>> main
 
     QVector<CameraInfo> cameraList;
     QVector<QMediaPlayer*> players;

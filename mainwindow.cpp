@@ -767,6 +767,7 @@ void MainWindow::onCameraListClicked()
     cameraListDialog->show();
     cameraListDialog->raise();
     cameraListDialog->activateWindow();
+}
 
 void MainWindow::setupWebSocketConnections()
 {
