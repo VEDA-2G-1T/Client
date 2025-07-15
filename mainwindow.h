@@ -15,6 +15,8 @@
 #include <QVideoWidget>
 #include <QNetworkAccessManager>
 #include <QSet>  // ✅ 이 줄 추가!
+#include <QWebSocket>
+#include <QMap>
 
 class CameraListDialog;
 
@@ -76,6 +78,12 @@ private:
                      const QString &details,
                      const QString &ip);
 
+    void setupWebSocketConnections();
+    void onSocketConnected();
+    void onSocketDisconnected();
+    void onSocketMessageReceived(const QString &message);
+    void onSocketErrorOccurred(QAbstractSocket::SocketError error);
+
     QVector<CameraInfo> cameraList;
     QVector<QMediaPlayer*> players;
     QVector<QVideoWidget*> videoWidgets;
@@ -101,6 +109,8 @@ private:
 
     CameraListDialog *cameraListDialog = nullptr;
     QNetworkAccessManager *networkManager;
+
+    QMap<QString, QWebSocket*> socketMap;  // IP → QWebSocket*
 };
 
 #endif // MAINWINDOW_H
