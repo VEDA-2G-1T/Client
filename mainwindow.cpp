@@ -508,7 +508,7 @@ void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &ca
         return;
     }
 
-    QString apiUrl = QString("http://%1/api/mode").arg(camera.ip);
+    QString apiUrl = QString("https://%1:8443/api/mode").arg(camera.ip);
     QUrl url(apiUrl);
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
@@ -519,6 +519,7 @@ void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &ca
     QByteArray data = doc.toJson();
 
     QNetworkReply *reply = networkManager->post(request, data);
+    reply->ignoreSslErrors();
 
     connect(reply, &QNetworkReply::finished, this, [=]() {
         reply->deleteLater();
@@ -776,6 +777,11 @@ void MainWindow::setupWebSocketConnections()
         if (socketMap.contains(camera.ip)) continue;  // 이미 연결된 경우 생략
 
         QWebSocket *socket = new QWebSocket();
+
+        connect(socket, &QWebSocket::sslErrors, this, [socket](const QList<QSslError> &) {
+            socket->ignoreSslErrors();
+        });
+
         connect(socket, &QWebSocket::connected, this, &MainWindow::onSocketConnected);
         connect(socket, &QWebSocket::disconnected, this, &MainWindow::onSocketDisconnected);
         /*connect(socket, QOverload<QAbstractSocket::SocketError>::of(&QWebSocket::error),
@@ -785,13 +791,13 @@ void MainWindow::setupWebSocketConnections()
         connect(socket, &QWebSocket::textMessageReceived,
                 this, &MainWindow::onSocketMessageReceived);
 
-        QString wsUrl = QString("ws://%1/ws").arg(camera.ip);
+        QString wsUrl = QString("wss://%1:8443/ws").arg(camera.ip);
         socket->open(QUrl(wsUrl));
         socketMap[camera.ip] = socket;
     }
 }
 
-
+/*
 void MainWindow::onSocketMessageReceived(const QString &message)
 {
     QJsonDocument doc = QJsonDocument::fromJson(message.toUtf8());
@@ -830,9 +836,9 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         QString ts = data["timestamp"].toString();
 
         QString event;
-        if (helmet < person && vest >= helmet)
+        if (helmet < person && vest >= person)
             event = "⛑️ 헬멧 미착용 감지";
-        else if (vest < person && helmet >= vest)
+        else if (vest < person && helmet >= person)
             event = "🦺 조끼 미착용 감지";
         else
             event = "⛑️ 🦺 PPE 미착용 감지";
@@ -865,6 +871,110 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         lastAnomalyStatus[camera.name] = status;
     }
 }
+*/
+
+void MainWindow::onSocketMessageReceived(const QString &message)
+{
+    qDebug() << "🛰️ [WebSocket 수신 메시지]" << message;
+
+    QJsonDocument doc = QJsonDocument::fromJson(message.toUtf8());
+    if (!doc.isObject()) {
+        qWarning() << "⚠️ [WebSocket 메시지] JSON 파싱 실패";
+        return;
+    }
+
+    QJsonObject obj = doc.object();
+    QString type = obj["type"].toString();
+    QJsonObject data = obj["data"].toObject();
+
+    qDebug() << "📨 [WebSocket 타입]" << type;
+
+    QString ipSender;
+    QWebSocket *senderSocket = qobject_cast<QWebSocket*>(sender());
+    for (auto it = socketMap.begin(); it != socketMap.end(); ++it) {
+        if (it.value() == senderSocket) {
+            ipSender = it.key();
+            break;
+        }
+    }
+
+    if (ipSender.isEmpty()) {
+        qWarning() << "⚠️ [WebSocket] 발신자 IP 찾기 실패";
+        return;
+    }
+
+    const CameraInfo *cameraPtr = nullptr;
+    for (const CameraInfo &cam : cameraList) {
+        if (cam.ip == ipSender) {
+            cameraPtr = &cam;
+            break;
+        }
+    }
+    if (!cameraPtr) {
+        qWarning() << "⚠️ [WebSocket] CameraInfo 찾기 실패 for IP:" << ipSender;
+        return;
+    }
+    const CameraInfo &camera = *cameraPtr;
+
+    if (type == "new_detection") {
+        int person = data["person_count"].toInt();
+        int helmet = data["helmet_count"].toInt();
+        int vest = data["safety_vest_count"].toInt();
+        double conf = data["avg_confidence"].toDouble();
+        QString imagePath = data["image_path"].toString();
+        QString ts = data["timestamp"].toString();
+
+        QString event;
+        if (helmet < person && vest >= helmet)
+            event = "⛑️ 헬멧 미착용 감지";
+        else if (vest < person && helmet >= vest)
+            event = "🦺 조끼 미착용 감지";
+        else
+            event = "⛑️ 🦺 PPE 미착용 감지";
+
+        QString details = QString("👷 %1명 | ⛑️ %2명 | 🦺 %3명 | 신뢰도: %4")
+                              .arg(person).arg(helmet).arg(vest).arg(conf, 0, 'f', 2);
+
+        qDebug() << "📋 [PPE 이벤트]" << event << "IP:" << camera.ip;
+
+        addLogEntry(camera.name, "PPE", event, imagePath, details, camera.ip);
+    }
+    else if (type == "new_blur") {
+        QString ts = data["timestamp"].toString();
+        QString key = camera.name + "_" + ts;
+        if (recentBlurLogKeys.contains(key)) {
+            qDebug() << "ℹ️ [BLUR 중복 무시]" << key;
+            return;
+        }
+
+        int count = data["count"].toInt();
+        QString event = QString("🔍 %1명 감지").arg(count);
+
+        qDebug() << "📋 [Blur 이벤트]" << event << "IP:" << camera.ip;
+
+        addLogEntry(camera, "Blur", event, "", "");
+        recentBlurLogKeys.insert(key);
+    }
+    else if (type == "anomaly_status") {
+        QString status = data["status"].toString();
+        QString timestamp = data["timestamp"].toString();
+
+        qDebug() << "📢 [이상소음 상태]" << status << "at" << timestamp;
+
+        if (status == "detected" && lastAnomalyStatus[camera.name] != "detected") {
+            addLogEntry(camera.name, "Sound", "⚠️ 이상소음 감지됨", "", "이상소음 발생", camera.ip);
+        }
+        else if (status == "cleared" && lastAnomalyStatus[camera.name] == "detected") {
+            addLogEntry(camera.name, "Sound", "✅ 이상소음 해제됨", "", "이상소음 정상 상태", camera.ip);
+        }
+
+        lastAnomalyStatus[camera.name] = status;
+    }
+    else {
+        qWarning() << "⚠️ [WebSocket] 알 수 없는 타입 수신:" << type;
+    }
+}
+
 
 void MainWindow::onSocketConnected() {
     qDebug() << "[웹소켓] 연결됨";
@@ -875,15 +985,16 @@ void MainWindow::onSocketDisconnected() {
 void MainWindow::onSocketErrorOccurred(QAbstractSocket::SocketError error) {
     qDebug() << "[웹소켓 오류]" << error;
 }
-
+/*
 void MainWindow::loadInitialLogs()
 {
     fullLogEntries.clear();  // 기존 로그 초기화
 
     for (const CameraInfo &camera : cameraList) {
-        QString urlPPE = QString("http://%1/api/detections").arg(camera.ip);
+        QString urlPPE = QString("http://%1:8443/api/detections").arg(camera.ip);
         QNetworkRequest reqPPE{QUrl(urlPPE)};
         QNetworkReply *replyPPE = networkManager->get(reqPPE);
+        replyPPE->ignoreSslErrors();
         connect(replyPPE, &QNetworkReply::finished, this, [=]() {
             replyPPE->deleteLater();
             if (replyPPE->error() != QNetworkReply::NoError) return;
@@ -919,3 +1030,65 @@ void MainWindow::loadInitialLogs()
         });
     }
 }
+*/
+
+void MainWindow::loadInitialLogs()
+{
+    fullLogEntries.clear();  // 기존 로그 초기화
+
+    for (const CameraInfo &camera : cameraList) {
+        QString urlPPE = QString("https://%1:8443/api/detections").arg(camera.ip);  // ✅ HTTPS 수정도 반영
+
+        QNetworkRequest reqPPE{QUrl(urlPPE)};
+        QNetworkReply *replyPPE = networkManager->get(reqPPE);
+        replyPPE->ignoreSslErrors();  // ✅ 자가서명 무시
+
+        connect(replyPPE, &QNetworkReply::finished, this, [=]() {
+            replyPPE->deleteLater();
+
+            if (replyPPE->error() != QNetworkReply::NoError) {
+                qWarning() << "[로그 요청 실패]" << camera.ip << ":" << replyPPE->errorString();
+                return;
+            }
+
+            QByteArray raw = replyPPE->readAll();
+
+            QJsonDocument doc = QJsonDocument::fromJson(raw);
+            if (!doc.isObject()) {
+                qWarning() << "[JSON 파싱 실패]" << camera.ip;
+                return;
+            }
+
+            QJsonArray arr = doc["detections"].toArray();
+
+            for (const QJsonValue &val : arr) {
+                QJsonObject obj = val.toObject();
+                int person = obj["person_count"].toInt();
+                int helmet = obj["helmet_count"].toInt();
+                int vest = obj["safety_vest_count"].toInt();
+                double conf = obj["avg_confidence"].toDouble();
+                QString ts = obj["timestamp"].toString();
+                QString imgPath = obj["image_path"].toString();
+
+                QString event;
+                if (helmet < person && vest >= helmet)
+                    event = "⛑️ 헬멧 미착용 감지";
+                else if (vest < person && helmet >= vest)
+                    event = "🦺 조끼 미착용 감지";
+                else
+                    event = "⛑️ 🦺 PPE 미착용 감지";
+
+                QString detail = QString("👷 %1명 | ⛑️ %2명 | 🦺 %3명 | 신뢰도: %4")
+                                     .arg(person).arg(helmet).arg(vest).arg(conf, 0, 'f', 2);
+
+                fullLogEntries.append({
+                    camera.name, "PPE", event, imgPath, detail,
+                    ts.left(10), ts.mid(11, 8),
+                    static_cast<int>(cameraList.indexOf(camera)) + 1, camera.ip
+                });
+            }
+
+        });
+    }
+}
+
