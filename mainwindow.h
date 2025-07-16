@@ -66,7 +66,6 @@ private slots:
     void onCameraListClicked();
     void onLogHistoryClicked();
     void sendModeChangeRequest(const QString &mode, const CameraInfo &camera);
-    void pollLogsFromServer();
     void onAlertItemClicked(int row, int column);  // ✅ 새로 추가
 
 private:
@@ -76,11 +75,12 @@ private:
     void setupLogSection();
     void setupFunctionPanel();
     void setupMainLayout();
-
+    /*
     void addLogEntry(const CameraInfo &camera, const QString &event, const QString &imagePath, const QString &details);
     void addLogEntry(const QString &cameraName, const QString &event,
                      const QString &imagePath, const QString &details, const QString &ip);
     void addLogEntry(const CameraInfo &camera, const QString &function, const QString &event, const QString &imagePath, const QString &details);  // ✅ 새 시그니처
+    */
     void addLogEntry(const QString &cameraName,
                      const QString &function,
                      const QString &event,
