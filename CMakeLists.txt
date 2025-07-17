@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ✅ WebSockets 모듈 포함
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Multimedia MultimediaWidgets WebSockets)
+find_package(Qt6 REQUIRED COMPONENTS Core)
 
 qt_standard_project_setup()
 
@@ -30,6 +31,8 @@ set(HEADERS
 qt_add_executable(QtClientSSN
     ${SOURCES}
     ${HEADERS}
+    videoplayermanager.h videoplayermanager.cpp
+    camerainfo.h
 )
 
 # ✅ WebSockets + Multimedia 링크 추가
@@ -40,6 +43,7 @@ target_link_libraries(QtClientSSN
     PRIVATE Qt6::MultimediaWidgets
     PRIVATE Qt6::WebSockets        # ✅ 추가됨
 )
+target_link_libraries(QtClientSSN PRIVATE Qt6::Core)
 
 # Windows 전용 속성
 if(WIN32)

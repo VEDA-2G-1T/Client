@@ -1,6 +1,9 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "videoplayermanager.h"
+#include "camerainfo.h"
+
 #include <QMainWindow>
 #include <QVector>
 #include <QString>
@@ -20,6 +23,7 @@
 
 class CameraListDialog;
 
+/*
 struct CameraInfo {
     QString name;
     QString ip;
@@ -33,6 +37,7 @@ struct CameraInfo {
         return name == other.name && ip == other.ip && port == other.port;
     }
 };
+*/
 
 // logentry.h 또는 mainwindow.h 내부 등 구조체 선언부에 아래처럼 추가
 struct LogEntry {
@@ -66,7 +71,7 @@ private slots:
     void onCameraListClicked();
     void onLogHistoryClicked();
     void sendModeChangeRequest(const QString &mode, const CameraInfo &camera);
-    void onAlertItemClicked(int row, int column);  // ✅ 새로 추가
+    void onAlertItemClicked(int row, int column);
 
 private:
     void setupUI();
@@ -75,19 +80,13 @@ private:
     void setupLogSection();
     void setupFunctionPanel();
     void setupMainLayout();
-    /*
-    void addLogEntry(const CameraInfo &camera, const QString &event, const QString &imagePath, const QString &details);
-    void addLogEntry(const QString &cameraName, const QString &event,
-                     const QString &imagePath, const QString &details, const QString &ip);
-    void addLogEntry(const CameraInfo &camera, const QString &function, const QString &event, const QString &imagePath, const QString &details);  // ✅ 새 시그니처
-    */
     void addLogEntry(const QString &cameraName,
                      const QString &function,
                      const QString &event,
                      const QString &imagePath,
                      const QString &details,
                      const QString &ip);
-    void loadInitialLogs();  // ← private: 섹션에 선언
+    void loadInitialLogs();
 
     QHBoxLayout *topLayout;
     QWidget *videoSection;
@@ -100,11 +99,13 @@ private:
     void onSocketMessageReceived(const QString &message);
     void onSocketErrorOccurred(QAbstractSocket::SocketError error);
 
+    VideoPlayerManager *videoPlayerManager = nullptr;
+
     QVector<CameraInfo> cameraList;
     QVector<QMediaPlayer*> players;
     QVector<QVideoWidget*> videoWidgets;
     QVector<LogEntry> fullLogEntries;
-    QMap<QString, QString> lastAnomalyStatus;  // 카메라 이름 -> 마지막 상태 ("detected"/"cleared")
+    QMap<QString, QString> lastAnomalyStatus;
 
     QWidget *centralWidget;
     QWidget *videoArea;

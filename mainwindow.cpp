@@ -28,6 +28,8 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
+    videoPlayerManager = new VideoPlayerManager(this);
+
     setupUI();
     setWindowTitle("Smart SafetyNet");
     setMinimumSize(1500, 800);
@@ -60,6 +62,7 @@ void MainWindow::setupUI() {
     centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
 
+    setupVideoSection();
     setupTopBar();
     setupVideoSection();
     setupLogSection();
@@ -104,6 +107,7 @@ void MainWindow::setupVideoSection() {
     scrollArea->setWidgetResizable(true);
     scrollArea->setWidget(videoArea);
     scrollArea->setFixedWidth(2 * 320 + 3);
+    scrollArea->setFrameStyle(QFrame::NoFrame);
 
     QVBoxLayout *videoLayout = new QVBoxLayout();
     videoLayout->addLayout(streamingHeaderLayout);
@@ -111,7 +115,7 @@ void MainWindow::setupVideoSection() {
 
     videoSection = new QWidget();
     videoSection->setLayout(videoLayout);
-    videoSection->setFixedWidth(640);
+    videoSection->setFixedWidth(640 + 20);
 }
 
 void MainWindow::setupLogSection() {
@@ -279,6 +283,7 @@ void MainWindow::setupMainLayout() {
     mainLayout->addLayout(mainBodyLayout);
 }
 
+/*
 // refreshVideoGrid()
 void MainWindow::refreshVideoGrid()
 {
@@ -379,114 +384,84 @@ void MainWindow::refreshVideoGrid()
     setupWebSocketConnections();
     loadInitialLogs();  // ✅ 카메라 재정렬 이후 초기 로그 불러오기
 }
+*/
+
+void MainWindow::refreshVideoGrid()
+{
+    if (!videoGridLayout || !videoArea || !videoPlayerManager) {
+        qWarning() << "[refreshVideoGrid] 필수 구성요소가 아직 초기화되지 않았습니다.";
+        return;
+    }
+
+    // 화면 크기 조정
+    int total = std::max(4, static_cast<int>(cameraList.size()));
+    int columns = 2;
+    int rows = (total + 1) / 2;
+    videoArea->setMinimumSize(columns * 320, rows * 240);
+
+    // 현재 체크박스 상태 기준으로 스트림 suffix 결정
+    QString streamSuffix = "raw";
+    if (blurCheckBox->isChecked() || ppeDetectorCheckBox->isChecked()) {
+        streamSuffix = "processed";
+    }
+
+    // ✅ 스트리밍 구성은 VideoPlayerManager에게 위임
+    videoPlayerManager->setupVideoGrid(videoGridLayout, cameraList, streamSuffix);
+
+    // ✅ 모든 카메라가 삭제된 경우: 체크박스 초기화
+    if (cameraList.isEmpty()) {
+        rawCheckBox->blockSignals(true);
+        blurCheckBox->blockSignals(true);
+        ppeDetectorCheckBox->blockSignals(true);
+
+        rawCheckBox->setChecked(false);
+        blurCheckBox->setChecked(false);
+        ppeDetectorCheckBox->setChecked(false);
+
+        rawCheckBox->blockSignals(false);
+        blurCheckBox->blockSignals(false);
+        ppeDetectorCheckBox->blockSignals(false);
+    }
+
+    // ✅ 카메라가 있고 아무 모드도 선택 안되어 있을 경우 → Raw 적용
+    if (!cameraList.isEmpty() && !blurCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
+        rawCheckBox->blockSignals(true);
+        rawCheckBox->setChecked(true);
+        rawCheckBox->blockSignals(false);
+
+        for (const CameraInfo &camera : cameraList)
+            sendModeChangeRequest("raw", camera);
+
+        switchStreamForAllPlayers("raw");
+
+        addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
+    }
+
+    setupWebSocketConnections();
+    loadInitialLogs();  // ✅ 카메라 재정렬 이후 초기 로그 불러오기
+}
 
 /*
-void MainWindow::addLogEntry(const QString &cameraName, const QString &event,
-                             const QString &imagePath, const QString &details, const QString &ip)
+void MainWindow::switchStreamForAllPlayers(const QString &suffix)
 {
-    QString function = event.contains("Blur") ? "Blur" : "PPE";
-    int zone = -1;
+    for (int i = 0; i < cameraList.size() && i < players.size(); ++i) {
+        QString streamUrl = QString("rtsps://%1:%2/%3")
+        .arg(cameraList[i].ip)
+            .arg(cameraList[i].port)
+            .arg(suffix);
 
-    for (int i = 0; i < cameraList.size(); ++i) {
-        if (cameraList[i].name == cameraName) {
-            zone = i + 1;
-            break;
-        }
+        players[i]->stop();  // 기존 스트림 중지
+        players[i]->setSource(QUrl(streamUrl));
+        players[i]->play();  // 새 스트림 시작
     }
-
-    QString date = QDate::currentDate().toString("yyyy-MM-dd");
-    QString time = QTime::currentTime().toString("HH:mm:ss");
-
-    logTable->insertRow(0);
-    logTable->setItem(0, 0, new QTableWidgetItem(cameraName));
-    logTable->setItem(0, 1, new QTableWidgetItem(date));  // ✅ Date
-    logTable->setItem(0, 2, new QTableWidgetItem(time));  // ✅ Time
-    logTable->setItem(0, 3, new QTableWidgetItem(function));
-    logTable->setItem(0, 4, new QTableWidgetItem(event));
-
-    fullLogEntries.prepend({
-        cameraName,
-        function,
-        event,
-        imagePath,
-        details,
-        date,
-        time,
-        zone,
-        ip
-    });
-
-    if (logTable->rowCount() > 20)
-        logTable->removeRow(logTable->rowCount() - 1);
-}
-
-void MainWindow::addLogEntry(const CameraInfo &camera, const QString &event,
-                             const QString &imagePath, const QString &details)
-{
-    addLogEntry(camera.name, event, imagePath, details, camera.ip);
-}
-
-void MainWindow::addLogEntry(const CameraInfo &camera, const QString &function,
-                             const QString &event, const QString &imagePath, const QString &details)
-{
-    QString date = QDate::currentDate().toString("yyyy-MM-dd");
-    QString time = QTime::currentTime().toString("HH:mm:ss");
-
-    int zone = -1;
-    for (int i = 0; i < cameraList.size(); ++i) {
-        if (cameraList[i].name == camera.name) {
-            zone = i + 1;
-            break;
-        }
-    }
-
-    logTable->insertRow(0);
-    logTable->setItem(0, 0, new QTableWidgetItem(camera.name));
-    logTable->setItem(0, 1, new QTableWidgetItem(date));  // ✅ Date
-    logTable->setItem(0, 2, new QTableWidgetItem(time));  // ✅ Time
-    logTable->setItem(0, 3, new QTableWidgetItem(function));
-    logTable->setItem(0, 4, new QTableWidgetItem(event));
-
-    fullLogEntries.prepend({
-        camera.name,
-        function,
-        event,
-        imagePath,
-        details,
-        date,
-        time,
-        zone,
-        camera.ip
-    });
-
-    if (logTable->rowCount() > 20)
-        logTable->removeRow(logTable->rowCount() - 1);
-}
-
-// (4) 카메라 이름 기반 – function 수동 지정 ← ✅ 새로 추가한 함수
-void MainWindow::addLogEntry(const QString &cameraName,
-                             const QString &function,
-                             const QString &event,
-                             const QString &imagePath,
-                             const QString &details,
-                             const QString &ip)
-{
-    QString date = QDate::currentDate().toString("yyyy-MM-dd");
-    QString time = QTime::currentTime().toString("HH:mm:ss");
-
-    logTable->insertRow(0);
-    logTable->setItem(0, 0, new QTableWidgetItem(cameraName));
-    logTable->setItem(0, 1, new QTableWidgetItem(date));  // ✅ Date
-    logTable->setItem(0, 2, new QTableWidgetItem(time));  // ✅ Time
-    logTable->setItem(0, 3, new QTableWidgetItem(function));
-    logTable->setItem(0, 4, new QTableWidgetItem(event));
-
-    fullLogEntries.prepend({cameraName, function, event, imagePath, details, date, time, -1, ip});
-
-    if (logTable->rowCount() > 20)
-        logTable->removeRow(logTable->rowCount() - 1);
 }
 */
+
+void MainWindow::switchStreamForAllPlayers(const QString &suffix)
+{
+    if (videoPlayerManager)
+        videoPlayerManager->switchStreamForAllPlayers(cameraList, suffix);
+}
 
 void MainWindow::addLogEntry(const QString &cameraName,
                              const QString &function,
@@ -581,19 +556,6 @@ void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &ca
     });
 }
 
-void MainWindow::switchStreamForAllPlayers(const QString &suffix)
-{
-    for (int i = 0; i < cameraList.size() && i < players.size(); ++i) {
-        QString streamUrl = QString("rtsps://%1:%2/%3")
-        .arg(cameraList[i].ip)
-            .arg(cameraList[i].port)
-            .arg(suffix);
-
-        players[i]->stop();  // 기존 스트림 중지
-        players[i]->setSource(QUrl(streamUrl));
-        players[i]->play();  // 새 스트림 시작
-    }
-}
 
 void MainWindow::onAlertItemClicked(int row, int column)
 {

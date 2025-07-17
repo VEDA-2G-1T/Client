@@ -1,10 +1,12 @@
 #ifndef CAMERALISTDIALOG_H
 #define CAMERALISTDIALOG_H
 
+#include "mainwindow.h"
+#include "camerainfo.h"
+
 #include <QDialog>
 #include <QTableWidget>
 #include <QPushButton>
-#include "mainwindow.h"  // CameraInfo 사용을 위해 필요
 
 class CameraListDialog : public QDialog
 {

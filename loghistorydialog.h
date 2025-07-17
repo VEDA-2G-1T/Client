@@ -2,6 +2,7 @@
 #define LOGHISTORYDIALOG_H
 
 #include "mainwindow.h"  // ✅ LogEntry 구조체 정의 포함
+#include "camerainfo.h"
 
 #include <QDialog>
 #include <QTableWidget>
