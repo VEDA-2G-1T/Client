@@ -719,9 +719,9 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         QString ts = data["timestamp"].toString();
 
         QString event;
-        if (helmet < person && vest >= helmet)
+        if (helmet < person && vest >= person)
             event = "⛑️ 헬멧 미착용 감지";
-        else if (vest < person && helmet >= vest)
+        else if (vest < person && helmet >= person)
             event = "🦺 조끼 미착용 감지";
         else
             event = "⛑️ 🦺 PPE 미착용 감지";
