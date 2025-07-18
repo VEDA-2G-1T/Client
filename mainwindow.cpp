@@ -260,12 +260,17 @@ void MainWindow::setupFunctionPanel() {
         }
     });
 
+    QPushButton *healthCheckButton = new QPushButton("🩺 헬시 체크");
+    connect(healthCheckButton, &QPushButton::clicked, this, &MainWindow::performHealthCheck);
+
     QVBoxLayout *functionLayout = new QVBoxLayout();
     functionLayout->addWidget(functionLabelButton);
     functionLayout->addWidget(rawCheckBox);
     functionLayout->addWidget(blurCheckBox);
     functionLayout->addWidget(ppeDetectorCheckBox);
     functionLayout->addStretch();
+
+    functionLayout->addWidget(healthCheckButton);
 
     functionSection = new QWidget();
     functionSection->setLayout(functionLayout);
@@ -681,7 +686,7 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         qWarning() << "⚠️ [WebSocket] 발신자 IP 찾기 실패";
         return;
     }
-
+    /*
     const CameraInfo *cameraPtr = nullptr;
     for (const CameraInfo &cam : cameraList) {
         if (cam.ip == ipSender) {
@@ -689,6 +694,16 @@ void MainWindow::onSocketMessageReceived(const QString &message)
             break;
         }
     }
+    */
+
+    const CameraInfo *cameraPtr = nullptr;
+    for (int i = 0; i < cameraList.size(); ++i) {
+        if (cameraList[i].ip.trimmed() == ipSender.trimmed()) {  // 공백 방지
+            cameraPtr = &cameraList[i];
+            break;
+        }
+    }
+
     if (!cameraPtr) {
         qWarning() << "⚠️ [WebSocket] CameraInfo 찾기 실패 for IP:" << ipSender;
         return;
@@ -749,6 +764,21 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         }
 
         lastAnomalyStatus[camera.name] = status;
+    }
+    else if (type == "stm_status_update") {
+        qDebug() << "🩺 [STM 상태 응답 수신]" << data;
+        double temp = data["temperature"].toDouble();
+        int light = data["light"].toInt();
+        bool buzzer = data["buzzer_on"].toBool();
+        bool led = data["led_on"].toBool();
+
+        QString details = QString("🌡️ 온도: %1°C | 💡 밝기: %2 | 🔔 버저: %3 | 💡 LED: %4")
+                              .arg(temp, 0, 'f', 2)
+                              .arg(light)
+                              .arg(buzzer ? "ON" : "OFF")
+                              .arg(led ? "ON" : "OFF");
+
+        addLogEntry(camera.name, "Health", "✅ 상태 수신", "", details, camera.ip);
     }
     else {
         qWarning() << "⚠️ [WebSocket] 알 수 없는 타입 수신:" << type;
@@ -826,3 +856,18 @@ void MainWindow::loadInitialLogs()
     }
 }
 
+void MainWindow::performHealthCheck()
+{
+    for (const CameraInfo &camera : cameraList) {
+        if (socketMap.contains(camera.ip)) {
+            QWebSocket *socket = socketMap[camera.ip];
+            QJsonObject req;
+            req["type"] = "request_stm_status";
+            QJsonDocument doc(req);
+            socket->sendTextMessage(doc.toJson(QJsonDocument::Compact));
+            qDebug() << "[헬시체크 요청 전송]" << camera.ip;
+        } else {
+            qWarning() << "[헬시체크 실패] 웹소켓 없음:" << camera.ip;
+        }
+    }
+}

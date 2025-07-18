@@ -72,6 +72,7 @@ private slots:
     void onLogHistoryClicked();
     void sendModeChangeRequest(const QString &mode, const CameraInfo &camera);
     void onAlertItemClicked(int row, int column);
+    void performHealthCheck();
 
 private:
     void setupUI();
