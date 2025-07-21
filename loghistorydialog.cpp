@@ -140,7 +140,7 @@ void LogHistoryDialog::onRowClicked(int row, int column)
     if (cleanPath.startsWith("./"))
         cleanPath.remove(0, 2);  // "./" 제거
 
-    QString urlStr = QString("http://%1/%2").arg(entry.ip, cleanPath);  // ✅ entry.ip 필드 사용!
+    QString urlStr = QString("http://%1/%2").arg(entry.ip, cleanPath);  // entry.ip 필드 사용!
     QUrl url(urlStr);
     QNetworkRequest request(url);
 

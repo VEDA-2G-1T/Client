@@ -9,11 +9,11 @@ LoginWindow::LoginWindow(QWidget *parent)
     setupUI();
     setWindowTitle("Login - QtClientSSN Camera Monitoring System");
 
-    // ✅ 창 크기 자동 조절
+    // 창 크기 자동 조절
     adjustSize();
     setMinimumSize(sizeHint());
 
-    // ✅ 중앙 정렬 (Qt6 기준)
+    // 중앙 정렬 (Qt6 기준)
     QScreen *screen = QGuiApplication::primaryScreen();
     QRect screenGeometry = screen->availableGeometry();
     move(screenGeometry.center() - rect().center());
@@ -50,7 +50,7 @@ void LoginWindow::setupUI()
     loginButton = new QPushButton("Login");
     loginButton->setMinimumHeight(30);
 
-    // ✅ 종료 버튼 추가
+    // 종료 버튼 추가
     QPushButton *exitButton = new QPushButton("Exit");
     exitButton->setMinimumHeight(30);
 

@@ -167,9 +167,9 @@ void MainWindow::setupFunctionPanel() {
     blurCheckBox = new QCheckBox("Blur");
     ppeDetectorCheckBox = new QCheckBox("PPE Detector");
 
-    // ✅ Raw 체크박스
+    // Raw 체크박스
     connect(rawCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
-        // ✅ Raw는 해제되지 않도록 강제 복원
+        // Raw는 해제되지 않도록 강제 복원
         if (!checked) {
             rawCheckBox->blockSignals(true);
             rawCheckBox->setChecked(true);
@@ -177,7 +177,7 @@ void MainWindow::setupFunctionPanel() {
             return;
         }
 
-        // ✅ 나머지 모드는 해제하고 Raw 적용
+        // 나머지 모드는 해제하고 Raw 적용
         blurCheckBox->blockSignals(true);
         ppeDetectorCheckBox->blockSignals(true);
         blurCheckBox->setChecked(false);
@@ -188,11 +188,12 @@ void MainWindow::setupFunctionPanel() {
         for (const CameraInfo &camera : cameraList)
             sendModeChangeRequest("raw", camera);
 
-        switchStreamForAllPlayers("raw");
+        // switchStreamForAllPlayers("raw");
+        switchStreamForAllPlayers("processed");
         addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
     });
 
-    // ✅ Blur 체크박스
+    // Blur 체크박스
     connect(blurCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
         if (checked) {
             rawCheckBox->blockSignals(true);
@@ -210,7 +211,7 @@ void MainWindow::setupFunctionPanel() {
             addLogEntry("System", "Blur", "Blur mode enabled", "", "", "");
         } else {
             if (!rawCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
-                // ✅ 이미 Raw가 체크된 상태면 생략
+                // 이미 Raw가 체크된 상태면 생략
                 if (!rawCheckBox->isChecked()) {
                     rawCheckBox->blockSignals(true);
                     rawCheckBox->setChecked(true);
@@ -226,7 +227,7 @@ void MainWindow::setupFunctionPanel() {
         }
     });
 
-    // ✅ PPE Detector 체크박스
+    // PPE Detector 체크박스
     connect(ppeDetectorCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
         if (checked) {
             rawCheckBox->blockSignals(true);
@@ -244,7 +245,7 @@ void MainWindow::setupFunctionPanel() {
             addLogEntry("System", "PPE", "PPE Detector enabled", "", "", "");
         } else {
             if (!rawCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
-                // ✅ 이미 Raw가 체크된 상태면 생략
+                // 이미 Raw가 체크된 상태면 생략
                 if (!rawCheckBox->isChecked()) {
                     rawCheckBox->blockSignals(true);
                     rawCheckBox->setChecked(true);
@@ -260,7 +261,7 @@ void MainWindow::setupFunctionPanel() {
         }
     });
 
-    QPushButton *healthCheckButton = new QPushButton("🩺 헬시 체크");
+    QPushButton *healthCheckButton = new QPushButton("헬시 체크");
     connect(healthCheckButton, &QPushButton::clicked, this, &MainWindow::performHealthCheck);
 
     QVBoxLayout *functionLayout = new QVBoxLayout();
@@ -288,109 +289,6 @@ void MainWindow::setupMainLayout() {
     mainLayout->addLayout(mainBodyLayout);
 }
 
-/*
-// refreshVideoGrid()
-void MainWindow::refreshVideoGrid()
-{
-    // 레이아웃 초기화
-    QLayoutItem *child;
-    while ((child = videoGridLayout->takeAt(0)) != nullptr) {
-        if (child->widget())
-            child->widget()->deleteLater();
-        delete child;
-    }
-
-    // 기존 플레이어 제거
-    for (QMediaPlayer *player : players) {
-        player->stop();
-        delete player;
-    }
-    players.clear();
-    videoWidgets.clear();
-
-    // 화면 크기 조정
-    int total = std::max(4, static_cast<int>(cameraList.size()));
-    int columns = 2;
-    int rows = (total + 1) / 2;
-    videoArea->setMinimumSize(columns * 320, rows * 240);
-
-    // 현재 체크박스 상태 기준으로 스트림 suffix 결정
-    QString streamSuffix = "raw";
-    if (blurCheckBox->isChecked() || ppeDetectorCheckBox->isChecked()) {
-        streamSuffix = "processed";
-    }
-
-    // 카메라 별 영상 위젯 배치
-    for (int i = 0; i < total; ++i) {
-        QWidget *videoFrame = new QWidget();
-        videoFrame->setFixedSize(320, 240);
-        videoFrame->setStyleSheet("background-color: black; border: 1px solid #555;");
-
-        if (i < cameraList.size()) {
-            QLabel *nameLabel = new QLabel(cameraList[i].name, videoFrame);
-            nameLabel->setStyleSheet("color: white; font-weight: bold; background-color: rgba(0,0,0,100); padding: 2px;");
-            nameLabel->move(5, 5);
-            nameLabel->show();
-
-            QVideoWidget *vw = new QVideoWidget(videoFrame);
-            vw->setGeometry(0, 0, 320, 240);
-            vw->lower();
-
-            QMediaPlayer *player = new QMediaPlayer(this);
-            player->setVideoOutput(vw);
-
-            QString url = QString("rtsps://%1:%2/%3")
-                              .arg(cameraList[i].ip)
-                              .arg(cameraList[i].port)
-                              .arg(streamSuffix);
-            player->setSource(QUrl(url));
-            player->play();
-
-            players.append(player);
-            videoWidgets.append(vw);
-        } else {
-            QLabel *noCam = new QLabel("No Camera", videoFrame);
-            noCam->setAlignment(Qt::AlignCenter);
-            noCam->setGeometry(0, 0, 320, 240);
-            noCam->setStyleSheet("color: white;");
-        }
-
-        videoGridLayout->addWidget(videoFrame, i / columns, i % columns);
-    }
-
-    // ✅ 모든 카메라가 삭제된 경우: 체크박스 초기화
-    if (cameraList.isEmpty()) {
-        rawCheckBox->blockSignals(true);
-        blurCheckBox->blockSignals(true);
-        ppeDetectorCheckBox->blockSignals(true);
-
-        rawCheckBox->setChecked(false);
-        blurCheckBox->setChecked(false);
-        ppeDetectorCheckBox->setChecked(false);
-
-        rawCheckBox->blockSignals(false);
-        blurCheckBox->blockSignals(false);
-        ppeDetectorCheckBox->blockSignals(false);
-    }
-
-    // ✅ 카메라가 있고 아무 모드도 선택 안되어 있을 경우 → Raw 적용
-    if (!cameraList.isEmpty() && !blurCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
-        rawCheckBox->blockSignals(true);
-        rawCheckBox->setChecked(true);
-        rawCheckBox->blockSignals(false);
-
-        for (const CameraInfo &camera : cameraList)
-            sendModeChangeRequest("raw", camera);
-
-        switchStreamForAllPlayers("raw");
-
-        addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
-    }
-    setupWebSocketConnections();
-    loadInitialLogs();  // ✅ 카메라 재정렬 이후 초기 로그 불러오기
-}
-*/
-
 void MainWindow::refreshVideoGrid()
 {
     if (!videoGridLayout || !videoArea || !videoPlayerManager) {
@@ -405,15 +303,16 @@ void MainWindow::refreshVideoGrid()
     videoArea->setMinimumSize(columns * 320, rows * 240);
 
     // 현재 체크박스 상태 기준으로 스트림 suffix 결정
-    QString streamSuffix = "raw";
+    // QString streamSuffix = "raw";
+    QString streamSuffix = "processed";
     if (blurCheckBox->isChecked() || ppeDetectorCheckBox->isChecked()) {
         streamSuffix = "processed";
     }
 
-    // ✅ 스트리밍 구성은 VideoPlayerManager에게 위임
+    // 스트리밍 구성은 VideoPlayerManager에게 위임
     videoPlayerManager->setupVideoGrid(videoGridLayout, cameraList, streamSuffix);
 
-    // ✅ 모든 카메라가 삭제된 경우: 체크박스 초기화
+    // 모든 카메라가 삭제된 경우: 체크박스 초기화
     if (cameraList.isEmpty()) {
         rawCheckBox->blockSignals(true);
         blurCheckBox->blockSignals(true);
@@ -428,7 +327,7 @@ void MainWindow::refreshVideoGrid()
         ppeDetectorCheckBox->blockSignals(false);
     }
 
-    // ✅ 카메라가 있고 아무 모드도 선택 안되어 있을 경우 → Raw 적용
+    // 카메라가 있고 아무 모드도 선택 안되어 있을 경우 → Raw 적용
     if (!cameraList.isEmpty() && !blurCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
         rawCheckBox->blockSignals(true);
         rawCheckBox->setChecked(true);
@@ -437,30 +336,15 @@ void MainWindow::refreshVideoGrid()
         for (const CameraInfo &camera : cameraList)
             sendModeChangeRequest("raw", camera);
 
-        switchStreamForAllPlayers("raw");
+        // switchStreamForAllPlayers("raw");
+        switchStreamForAllPlayers("processed");
 
         addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
     }
 
     setupWebSocketConnections();
-    loadInitialLogs();  // ✅ 카메라 재정렬 이후 초기 로그 불러오기
+    loadInitialLogs();  // 카메라 재정렬 이후 초기 로그 불러오기
 }
-
-/*
-void MainWindow::switchStreamForAllPlayers(const QString &suffix)
-{
-    for (int i = 0; i < cameraList.size() && i < players.size(); ++i) {
-        QString streamUrl = QString("rtsps://%1:%2/%3")
-        .arg(cameraList[i].ip)
-            .arg(cameraList[i].port)
-            .arg(suffix);
-
-        players[i]->stop();  // 기존 스트림 중지
-        players[i]->setSource(QUrl(streamUrl));
-        players[i]->play();  // 새 스트림 시작
-    }
-}
-*/
 
 void MainWindow::switchStreamForAllPlayers(const QString &suffix)
 {
@@ -512,7 +396,7 @@ void MainWindow::addLogEntry(const QString &cameraName,
 
 void MainWindow::onLogHistoryClicked()
 {
-    LogHistoryDialog dialog(this, &fullLogEntries);  // ✅ 로그 목록 전달
+    LogHistoryDialog dialog(this, &fullLogEntries);  // 로그 목록 전달
     dialog.exec();
 }
 
@@ -578,7 +462,7 @@ void MainWindow::onAlertItemClicked(int row, int column)
         return;
     }
 
-    // ✅ 상대 경로일 경우 "./" 제거
+    // 상대 경로일 경우 "./" 제거
     QString imagePath = entry.imagePath;
     if (imagePath.startsWith("../"))
         imagePath = imagePath.mid(3);
@@ -659,11 +543,11 @@ void MainWindow::setupWebSocketConnections()
 
 void MainWindow::onSocketMessageReceived(const QString &message)
 {
-    qDebug() << "🛰️ [WebSocket 수신 메시지]" << message;
+    qDebug() << "[WebSocket 수신 메시지]" << message;
 
     QJsonDocument doc = QJsonDocument::fromJson(message.toUtf8());
     if (!doc.isObject()) {
-        qWarning() << "⚠️ [WebSocket 메시지] JSON 파싱 실패";
+        qWarning() << "[WebSocket 메시지] JSON 파싱 실패";
         return;
     }
 
@@ -683,18 +567,9 @@ void MainWindow::onSocketMessageReceived(const QString &message)
     }
 
     if (ipSender.isEmpty()) {
-        qWarning() << "⚠️ [WebSocket] 발신자 IP 찾기 실패";
+        qWarning() << "[WebSocket] 발신자 IP 찾기 실패";
         return;
     }
-    /*
-    const CameraInfo *cameraPtr = nullptr;
-    for (const CameraInfo &cam : cameraList) {
-        if (cam.ip == ipSender) {
-            cameraPtr = &cam;
-            break;
-        }
-    }
-    */
 
     const CameraInfo *cameraPtr = nullptr;
     for (int i = 0; i < cameraList.size(); ++i) {
@@ -705,7 +580,7 @@ void MainWindow::onSocketMessageReceived(const QString &message)
     }
 
     if (!cameraPtr) {
-        qWarning() << "⚠️ [WebSocket] CameraInfo 찾기 실패 for IP:" << ipSender;
+        qWarning() << "[WebSocket] CameraInfo 찾기 실패 for IP:" << ipSender;
         return;
     }
     const CameraInfo &camera = *cameraPtr;
@@ -729,7 +604,7 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         QString details = QString("👷 %1명 | ⛑️ %2명 | 🦺 %3명 | 신뢰도: %4")
                               .arg(person).arg(helmet).arg(vest).arg(conf, 0, 'f', 2);
 
-        qDebug() << "📋 [PPE 이벤트]" << event << "IP:" << camera.ip;
+        qDebug() << "[PPE 이벤트]" << event << "IP:" << camera.ip;
 
         addLogEntry(camera.name, "PPE", event, imagePath, details, camera.ip);
     }
@@ -737,14 +612,14 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         QString ts = data["timestamp"].toString();
         QString key = camera.name + "_" + ts;
         if (recentBlurLogKeys.contains(key)) {
-            qDebug() << "ℹ️ [BLUR 중복 무시]" << key;
+            qDebug() << "[BLUR 중복 무시]" << key;
             return;
         }
 
         int count = data["count"].toInt();
         QString event = QString("🔍 %1명 감지").arg(count);
 
-        qDebug() << "📋 [Blur 이벤트]" << event << "IP:" << camera.ip;
+        qDebug() << "[Blur 이벤트]" << event << "IP:" << camera.ip;
 
         addLogEntry(camera.name, "Blur", event, "", "", camera.ip);
         // addLogEntry(camera, "Blur", event, "", "");
@@ -754,7 +629,7 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         QString status = data["status"].toString();
         QString timestamp = data["timestamp"].toString();
 
-        qDebug() << "📢 [이상소음 상태]" << status << "at" << timestamp;
+        qDebug() << "[이상소음 상태]" << status << "at" << timestamp;
 
         if (status == "detected" && lastAnomalyStatus[camera.name] != "detected") {
             addLogEntry(camera.name, "Sound", "⚠️ 이상소음 감지됨", "", "이상소음 발생", camera.ip);
@@ -766,7 +641,7 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         lastAnomalyStatus[camera.name] = status;
     }
     else if (type == "stm_status_update") {
-        qDebug() << "🩺 [STM 상태 응답 수신]" << data;
+        qDebug() << "[STM 상태 응답 수신]" << data;
         double temp = data["temperature"].toDouble();
         int light = data["light"].toInt();
         bool buzzer = data["buzzer_on"].toBool();
@@ -781,7 +656,7 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         addLogEntry(camera.name, "Health", "✅ 상태 수신", "", details, camera.ip);
     }
     else {
-        qWarning() << "⚠️ [WebSocket] 알 수 없는 타입 수신:" << type;
+        qWarning() << "[WebSocket] 알 수 없는 타입 수신:" << type;
     }
 }
 
@@ -801,11 +676,11 @@ void MainWindow::loadInitialLogs()
     fullLogEntries.clear();  // 기존 로그 초기화
 
     for (const CameraInfo &camera : cameraList) {
-        QString urlPPE = QString("https://%1:8443/api/detections").arg(camera.ip);  // ✅ HTTPS 수정도 반영
+        QString urlPPE = QString("https://%1:8443/api/detections").arg(camera.ip);  // HTTPS 수정도 반영
 
         QNetworkRequest reqPPE{QUrl(urlPPE)};
         QNetworkReply *replyPPE = networkManager->get(reqPPE);
-        replyPPE->ignoreSslErrors();  // ✅ 자가서명 무시
+        replyPPE->ignoreSslErrors();  // 자가서명 무시
 
         connect(replyPPE, &QNetworkReply::finished, this, [=]() {
             replyPPE->deleteLater();
@@ -835,9 +710,9 @@ void MainWindow::loadInitialLogs()
                 QString imgPath = obj["image_path"].toString();
 
                 QString event;
-                if (helmet < person && vest >= helmet)
+                if (helmet < person && vest >= person)
                     event = "⛑️ 헬멧 미착용 감지";
-                else if (vest < person && helmet >= vest)
+                else if (vest < person && helmet >= person)
                     event = "🦺 조끼 미착용 감지";
                 else
                     event = "⛑️ 🦺 PPE 미착용 감지";

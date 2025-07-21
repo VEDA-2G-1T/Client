@@ -17,39 +17,23 @@
 #include <QMediaPlayer>
 #include <QVideoWidget>
 #include <QNetworkAccessManager>
-#include <QSet>  // ✅ 이 줄 추가!
+#include <QSet>  // 이 줄 추가!
 #include <QWebSocket>
 #include <QMap>
 
 class CameraListDialog;
 
-/*
-struct CameraInfo {
-    QString name;
-    QString ip;
-    QString port;
-
-    QString rtspUrl() const {
-        return QString("rtsps://%1:%2/raw").arg(ip, port);
-    }
-
-    bool operator==(const CameraInfo &other) const {
-        return name == other.name && ip == other.ip && port == other.port;
-    }
-};
-*/
-
 // logentry.h 또는 mainwindow.h 내부 등 구조체 선언부에 아래처럼 추가
 struct LogEntry {
     QString camera;
-    QString function;   // 👈 명시적 필드 추가
+    QString function;   // 명시적 필드 추가
     QString alert;
     QString imagePath;
     QString details;
     QString date;
     QString time;
-    int zone;  // ✅ 실제 스트리밍 영역 번호
-    QString ip; // ✅ IP 필드 추가
+    int zone;  // 실제 스트리밍 영역 번호
+    QString ip; // IP 필드 추가
 
 };
 
@@ -63,7 +47,7 @@ public:
     ~MainWindow();
 
     void refreshVideoGrid();
-    QSet<QString> recentBlurLogKeys;  // ✅ 중복 Blur 로그 방지용 키
+    QSet<QString> recentBlurLogKeys;  // 중복 Blur 로그 방지용 키
 
 
 

@@ -1,7 +1,7 @@
 #ifndef LOGHISTORYDIALOG_H
 #define LOGHISTORYDIALOG_H
 
-#include "mainwindow.h"  // ✅ LogEntry 구조체 정의 포함
+#include "mainwindow.h"  // LogEntry 구조체 정의 포함
 #include "camerainfo.h"
 
 #include <QDialog>
@@ -21,13 +21,13 @@ public:
 
 private slots:
     void onCloseClicked();
-    void onRowClicked(int row, int column);  // ✅ 추가
+    void onRowClicked(int row, int column);  // 추가
 
 private:
     void setupUI();
     void loadHistoryData();
 
-    const QVector<LogEntry>* logListPtr = nullptr;  // ✅ QPair → LogEntry로 변경
+    const QVector<LogEntry>* logListPtr = nullptr;  // QPair → LogEntry로 변경
     QTableWidget *historyTable;
     QPushButton *closeButton;
 };

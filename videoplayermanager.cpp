@@ -69,13 +69,6 @@ void VideoPlayerManager::setupVideoGrid(QGridLayout *layout, const QVector<Camer
             players.append(player);
             videoWidgets.append(vw);
         } else {
-            /*
-            QLabel *noCam = new QLabel("No Camera", videoFrame);
-            noCam->setAlignment(Qt::AlignCenter);
-            noCam->setGeometry(0, 0, 320, 240);
-            noCam->setStyleSheet("color: white;");
-            noCam->show();
-            */
             QVBoxLayout *noCamLayout = new QVBoxLayout(videoFrame);
             QLabel *noCam = new QLabel("No Camera");
             noCam->setAlignment(Qt::AlignCenter);
