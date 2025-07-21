@@ -1,4 +1,6 @@
 #include "cameraregistrationdialog.h"
+#include "camerainfo.h"
+
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -55,7 +57,7 @@ void CameraRegistrationDialog::setupUI()
     // 카메라 IP
     QLabel *ipLabel = new QLabel("카메라 IP:");
     ipEdit = new QLineEdit();
-    ipEdit->setPlaceholderText("예: 192.168.0.66");
+    ipEdit->setPlaceholderText("예: 192.168.0.87");
 
     // 정규식 유효성 검사기
     QRegularExpression ipRegex("^(?:(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$");
@@ -65,17 +67,17 @@ void CameraRegistrationDialog::setupUI()
     // 포트 번호
     QLabel *portLabel = new QLabel("포트번호:");
     portEdit = new QLineEdit();
-    portEdit->setPlaceholderText("예: 8554");
+    portEdit->setPlaceholderText("예: 8555");
 
     // 버튼 생성
     okButton = new QPushButton("등록");
     cancelButton = new QPushButton("취소");
 
-    // ✅ 버튼 글자 안 잘리게 폭 고정
+    // 버튼 글자 안 잘리게 폭 고정
     okButton->setFixedHeight(30);
     cancelButton->setFixedHeight(30);
 
-    // ✅ 버튼 폰트/패딩 스타일
+    // 버튼 폰트/패딩 스타일
 
     QString buttonStyle = R"(
         QPushButton {
@@ -100,12 +102,12 @@ void CameraRegistrationDialog::setupUI()
     mainLayout->addWidget(portEdit);
     mainLayout->addLayout(btnLayout);
 
-    // ✅ 다이얼로그 크기 확장 (진짜 중요!)
+    // 다이얼로그 크기 확장 (진짜 중요!)
     setFixedSize(420, 300);
     setModal(true);
     setWindowTitle("카메라 등록");
 
-    // ✅ 스타일 적용
+    // 스타일 적용
     setStyleSheet(R"(
         QDialog {
             background-color: #2b2b2b;
