@@ -86,6 +86,9 @@ private:
 
     QMap<QString, int> ppeViolationStreakMap;
 
+    QMap<QString, QDateTime> healthCheckRequestTime;  // IP → 요청 보낸 시각
+    QSet<QString> healthCheckResponded;
+
     VideoPlayerManager *videoPlayerManager = nullptr;
 
     QVector<CameraInfo> cameraList;

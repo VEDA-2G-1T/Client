@@ -344,6 +344,7 @@ void MainWindow::refreshVideoGrid()
 
     setupWebSocketConnections();
     loadInitialLogs();  // 카메라 재정렬 이후 초기 로그 불러오기
+    performHealthCheck();
 }
 
 void MainWindow::switchStreamForAllPlayers(const QString &suffix)
@@ -669,6 +670,7 @@ void MainWindow::onSocketMessageReceived(const QString &message)
                               .arg(buzzer ? "ON" : "OFF")
                               .arg(led ? "ON" : "OFF");
 
+        healthCheckResponded.insert(camera.ip);  // ✅ 응답 확인 기록
         addLogEntry(camera.name, "Health", "✅ 상태 수신", "", details, camera.ip);
     }
     else {
@@ -749,6 +751,7 @@ void MainWindow::loadInitialLogs()
 
 void MainWindow::performHealthCheck()
 {
+    healthCheckResponded.clear();
     for (const CameraInfo &camera : cameraList) {
         if (socketMap.contains(camera.ip)) {
             QWebSocket *socket = socketMap[camera.ip];
@@ -756,9 +759,18 @@ void MainWindow::performHealthCheck()
             req["type"] = "request_stm_status";
             QJsonDocument doc(req);
             socket->sendTextMessage(doc.toJson(QJsonDocument::Compact));
+
+            healthCheckRequestTime[camera.ip] = QDateTime::currentDateTime();
             qDebug() << "[헬시체크 요청 전송]" << camera.ip;
+
+            // ✅ 5초 후 응답 없으면 경고 로그 추가
+            QTimer::singleShot(5000, this, [=]() {
+                if (!healthCheckResponded.contains(camera.ip)) {
+                    addLogEntry(camera.name, "Health", "⚠️ 헬시체크 응답 없음", "", "STM 상태 응답이 5초 내 도착하지 않았습니다", camera.ip);
+                }
+            });
         } else {
-            qWarning() << "[헬시체크 실패] 웹소켓 없음:" << camera.ip;
+            addLogEntry(camera.name, "Health", "❌ 웹소켓 없음", "", "웹소켓 연결이 없어 상태 요청 불가", camera.ip);
         }
     }
 }
