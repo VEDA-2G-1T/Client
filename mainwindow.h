@@ -84,6 +84,8 @@ private:
     void onSocketMessageReceived(const QString &message);
     void onSocketErrorOccurred(QAbstractSocket::SocketError error);
 
+    QMap<QString, int> ppeViolationStreakMap;
+
     VideoPlayerManager *videoPlayerManager = nullptr;
 
     QVector<CameraInfo> cameraList;

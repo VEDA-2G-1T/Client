@@ -606,6 +606,22 @@ void MainWindow::onSocketMessageReceived(const QString &message)
 
         qDebug() << "[PPE 이벤트]" << event << "IP:" << camera.ip;
 
+        // PPE 알람 연속 횟수 추적
+        if (event.contains("미착용")) {
+            int count = ppeViolationStreakMap[camera.name] + 1;
+            ppeViolationStreakMap[camera.name] = count;
+
+            if (count >= 4) {
+                QMessageBox::warning(this, "지속적인 PPE 위반",
+                                     QString("%1 카메라에서 PPE 미착용이 연속 4회 감지되었습니다!").arg(camera.name));
+                ppeViolationStreakMap[camera.name] = 0;  // 리셋
+            }
+        } else {
+            // 다른 이벤트 발생 시 streak 초기화
+            ppeViolationStreakMap[camera.name] = 0;
+        }
+
+
         addLogEntry(camera.name, "PPE", event, imagePath, details, camera.ip);
     }
     else if (type == "new_blur") {
