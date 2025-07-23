@@ -34,6 +34,8 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowTitle("Smart SafetyNet");
     setMinimumSize(1500, 800);
 
+    showMaximized();  // ✅ 전체 화면으로 시작
+
     // REST API 통신용
     networkManager = new QNetworkAccessManager(this);
 
@@ -166,6 +168,9 @@ void MainWindow::setupFunctionPanel() {
     rawCheckBox = new QCheckBox("Raw");
     blurCheckBox = new QCheckBox("Blur");
     ppeDetectorCheckBox = new QCheckBox("PPE Detector");
+    nightIntrusionCheckBox = new QCheckBox("Night Intrusion");
+    fallDetectionCheckBox = new QCheckBox("Fall Detection");
+
 
     // Raw 체크박스
     connect(rawCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
@@ -261,6 +266,79 @@ void MainWindow::setupFunctionPanel() {
         }
     });
 
+
+    // NightIntrusion 체크
+    connect(nightIntrusionCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
+        if (checked) {
+            rawCheckBox->blockSignals(true);
+            blurCheckBox->blockSignals(true);
+            ppeDetectorCheckBox->blockSignals(true);
+            rawCheckBox->setChecked(false);
+            blurCheckBox->setChecked(false);
+            ppeDetectorCheckBox->setChecked(false);
+            rawCheckBox->blockSignals(false);
+            blurCheckBox->blockSignals(false);
+            ppeDetectorCheckBox->blockSignals(false);
+
+            for (const CameraInfo &camera : cameraList)
+                sendModeChangeRequest("detect", camera);  // 동일하게 detect 모드
+
+            switchStreamForAllPlayers("processed");
+            addLogEntry("System", "Night", "Night Intrusion enabled", "", "", "");
+        } else {
+            if (!rawCheckBox->isChecked() && !blurCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
+                rawCheckBox->blockSignals(true);
+                rawCheckBox->setChecked(true);
+                rawCheckBox->blockSignals(false);
+                for (const CameraInfo &camera : cameraList)
+                    sendModeChangeRequest("raw", camera);
+                switchStreamForAllPlayers("raw");
+                addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
+            }
+        }
+    });
+
+    // Fall 모드 체크
+    connect(fallDetectionCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
+        if (checked) {
+            // 다른 모드 해제
+            rawCheckBox->blockSignals(true);
+            blurCheckBox->blockSignals(true);
+            ppeDetectorCheckBox->blockSignals(true);
+            nightIntrusionCheckBox->blockSignals(true);
+
+            rawCheckBox->setChecked(false);
+            blurCheckBox->setChecked(false);
+            ppeDetectorCheckBox->setChecked(false);
+            nightIntrusionCheckBox->setChecked(false);
+
+            rawCheckBox->blockSignals(false);
+            blurCheckBox->blockSignals(false);
+            ppeDetectorCheckBox->blockSignals(false);
+            nightIntrusionCheckBox->blockSignals(false);
+
+            for (const CameraInfo &camera : cameraList)
+                sendModeChangeRequest("fall", camera);
+
+            switchStreamForAllPlayers("processed");
+            addLogEntry("System", "Fall", "Fall Detection enabled", "", "", "");
+        } else {
+            // 다른 모드도 비활성화되어 있으면 Raw 모드 자동 전환
+            if (!rawCheckBox->isChecked() && !blurCheckBox->isChecked()
+                && !ppeDetectorCheckBox->isChecked() && !nightIntrusionCheckBox->isChecked()) {
+                rawCheckBox->blockSignals(true);
+                rawCheckBox->setChecked(true);
+                rawCheckBox->blockSignals(false);
+
+                for (const CameraInfo &camera : cameraList)
+                    sendModeChangeRequest("raw", camera);
+
+                switchStreamForAllPlayers("raw");
+                addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
+            }
+        }
+    });
+
     QPushButton *healthCheckButton = new QPushButton("헬시 체크");
     connect(healthCheckButton, &QPushButton::clicked, this, &MainWindow::performHealthCheck);
 
@@ -269,6 +347,8 @@ void MainWindow::setupFunctionPanel() {
     functionLayout->addWidget(rawCheckBox);
     functionLayout->addWidget(blurCheckBox);
     functionLayout->addWidget(ppeDetectorCheckBox);
+    functionLayout->addWidget(nightIntrusionCheckBox);
+    functionLayout->addWidget(fallDetectionCheckBox);
     functionLayout->addStretch();
 
     functionLayout->addWidget(healthCheckButton);
@@ -400,7 +480,7 @@ void MainWindow::onLogHistoryClicked()
     LogHistoryDialog dialog(this, &fullLogEntries);  // 로그 목록 전달
     dialog.exec();
 }
-
+/*
 void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &camera)
 {
     if (camera.ip.isEmpty() || camera.port.isEmpty()) {
@@ -442,6 +522,58 @@ void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &ca
             }
         } else {
             qWarning() << "[모드 변경 네트워크 오류]" << camera.name << ":" << reply->errorString();
+        }
+    });
+}
+*/
+
+void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &camera)
+{
+    if (camera.ip.isEmpty()) {
+        qWarning() << "[모드 변경] 카메라 IP 없음 →" << camera.name;
+        return;
+    }
+
+    if (!socketMap.contains(camera.ip)) {
+        qWarning() << "[모드 변경] WebSocket 연결 없음 →" << camera.name;
+        return;
+    }
+
+    QWebSocket *socket = socketMap[camera.ip];
+    if (socket->state() != QAbstractSocket::ConnectedState) {
+        qWarning() << "[모드 변경] WebSocket 비연결 상태 →" << camera.name;
+        return;
+    }
+
+    // ✅ WebSocket 메시지 생성
+    QJsonObject payload;
+    payload["type"] = "set_mode";
+    payload["mode"] = mode;
+
+    QJsonDocument doc(payload);
+    QString message = doc.toJson(QJsonDocument::Compact);
+    socket->sendTextMessage(message);
+
+    qDebug() << "[WebSocket] 모드 변경 메시지 전송됨:" << message;
+
+    // ✅ WebSocket 응답 메시지 처리 (이 socket만을 위한 임시 슬롯)
+    connect(socket, &QWebSocket::textMessageReceived, this, [=](const QString &msg) {
+        QJsonDocument respDoc = QJsonDocument::fromJson(msg.toUtf8());
+        if (!respDoc.isObject()) return;
+
+        QJsonObject obj = respDoc.object();
+        QString type = obj["type"].toString();
+
+        if (type == "mode_change_ack") {
+            QString status = obj["status"].toString();
+            QString serverMessage = obj["message"].toString();
+
+            if (status == "error") {
+                qWarning() << "[모드 변경 실패]" << serverMessage;
+                QMessageBox::warning(this, "모드 변경 실패", serverMessage);
+            } else {
+                qDebug() << "[모드 변경 성공 응답]" << serverMessage;
+            }
         }
     });
 }
@@ -595,15 +727,25 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         QString ts = data["timestamp"].toString();
 
         QString event;
+        QString details = QString("👷 %1명 | ⛑️ %2명 | 🦺 %3명 | 신뢰도: %4")
+                              .arg(person).arg(helmet).arg(vest).arg(conf, 0, 'f', 2);
+
+        // ✅ Night Intrusion 모드인지 확인
+        if (nightIntrusionCheckBox && nightIntrusionCheckBox->isChecked()) {
+            event = QString("🌙 야간 무단 침입 감지 (%1명)").arg(person);
+
+            qDebug() << "[야간 침입 이벤트]" << event << "IP:" << camera.ip;
+            addLogEntry(camera.name, "Night", event, imagePath, details, camera.ip);
+            return;  // 여기서 PPE 처리를 생략하고 return
+        }
+
+        // ✅ 기존 PPE 감지 처리
         if (helmet < person && vest >= person)
             event = "⛑️ 헬멧 미착용 감지";
         else if (vest < person && helmet >= person)
             event = "🦺 조끼 미착용 감지";
         else
             event = "⛑️ 🦺 PPE 미착용 감지";
-
-        QString details = QString("👷 %1명 | ⛑️ %2명 | 🦺 %3명 | 신뢰도: %4")
-                              .arg(person).arg(helmet).arg(vest).arg(conf, 0, 'f', 2);
 
         qDebug() << "[PPE 이벤트]" << event << "IP:" << camera.ip;
 
@@ -613,18 +755,50 @@ void MainWindow::onSocketMessageReceived(const QString &message)
             ppeViolationStreakMap[camera.name] = count;
 
             if (count >= 4) {
-                QMessageBox::warning(this, "지속적인 PPE 위반",
-                                     QString("%1 카메라에서 PPE 미착용이 연속 4회 감지되었습니다!").arg(camera.name));
+                QMessageBox *popup = new QMessageBox(this);
+                popup->setIcon(QMessageBox::Warning);
+                popup->setWindowTitle("지속적인 PPE 위반");
+                popup->setText(QString("%1 카메라에서 PPE 미착용이 연속 4회 감지되었습니다!").arg(camera.name));
+                popup->setStandardButtons(QMessageBox::Ok);
+                popup->setModal(false);         // ✅ 비모달 설정
+
+                if (!imagePath.isEmpty()) {
+                    QString cleanPath = imagePath;
+                    if (cleanPath.startsWith("../"))
+                        cleanPath = cleanPath.mid(3);  // 상대경로 정리
+
+                    QString urlStr = QString("http://%1/%2").arg(camera.ip, cleanPath);
+                    QUrl url(urlStr);
+                    QNetworkRequest request(url);
+
+                    QNetworkAccessManager *manager = new QNetworkAccessManager(popup);  // 팝업에 소속
+                    QNetworkReply *reply = manager->get(request);
+
+                    connect(reply, &QNetworkReply::finished, popup, [=]() {
+                        reply->deleteLater();
+                        QPixmap pix;
+                        pix.loadFromData(reply->readAll());
+                        if (!pix.isNull()) {
+                            QLabel *imgLabel = new QLabel();
+                            imgLabel->setPixmap(pix.scaled(400, 300, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+                            popup->layout()->addWidget(imgLabel);
+                            popup->adjustSize();  // 이미지 포함 크기 자동 조정
+                        }
+                    });
+                }
+
+                popup->show();                  // ✅ show()만 사용하여 non-blocking
+
                 ppeViolationStreakMap[camera.name] = 0;  // 리셋
             }
+
         } else {
-            // 다른 이벤트 발생 시 streak 초기화
             ppeViolationStreakMap[camera.name] = 0;
         }
 
-
         addLogEntry(camera.name, "PPE", event, imagePath, details, camera.ip);
     }
+
     else if (type == "new_blur") {
         QString ts = data["timestamp"].toString();
         QString key = camera.name + "_" + ts;

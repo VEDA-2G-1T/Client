@@ -108,6 +108,8 @@ private:
     QCheckBox *rawCheckBox;
     QCheckBox *blurCheckBox;
     QCheckBox *ppeDetectorCheckBox;
+    QCheckBox *nightIntrusionCheckBox;
+    QCheckBox *fallDetectionCheckBox;  // 🔍 낙상 감지 모드
 
     QMap<QString, QString> lastPpeTimestamps;
     QMap<QString, QString> lastBlurTimestamps;
