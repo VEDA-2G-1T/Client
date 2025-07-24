@@ -32,8 +32,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     setupUI();
     setWindowTitle("Smart SafetyNet");
-    setMinimumSize(1500, 800);
-
     showMaximized();  // ✅ 전체 화면으로 시작
 
     // REST API 통신용
@@ -62,6 +60,9 @@ MainWindow::~MainWindow() {}
 
 void MainWindow::setupUI() {
     centralWidget = new QWidget(this);
+    centralWidget->setContentsMargins(0, 0, 0, 0);
+    // centralWidget->setStyleSheet("border: 3px solid blue;");
+
 
     setCentralWidget(centralWidget);
 
@@ -99,22 +100,33 @@ void MainWindow::setupOnvifSection()
 
     onvifView = new QGraphicsView(onvifScene);
     onvifView->setFixedSize(640, 360);
-    onvifView->setStyleSheet("background-color: black; border: none;");
+    onvifView->setStyleSheet("background-color: black; border: none; margin: 0px; padding: 0px;");
 
     onvifPlayer->setVideoOutput(onvifVideoItem);
     onvifPlayer->setSource(QUrl("rtsp://192.168.0.35:554/0/onvif/profile2/media.smp"));
     onvifPlayer->play();
 
     onvifSection = new QWidget();
-    QVBoxLayout *layout = new QVBoxLayout(onvifSection);
+    onvifSection->setFixedHeight(400);  // 360 + label 여유
+    QVBoxLayout *onvifLayout = new QVBoxLayout(onvifSection);  // ✅ 이름 변경
+    onvifLayout->setContentsMargins(10, 10, 10, 10);
+    onvifLayout->setSpacing(10);
+
+    QHBoxLayout *labelLayout = new QHBoxLayout();
     QLabel *label = new QLabel("ONVIF Camera Stream");
     label->setStyleSheet("font-weight: bold; color: orange;");
-    layout->addWidget(label);
-    layout->addWidget(onvifView);
-    layout->addStretch();
+    labelLayout->addWidget(label);
+    labelLayout->addStretch();  // 선택사항: 오른쪽 정렬용
+    qDebug() << "ONVIF height:" << label->sizeHint().height();
+
+    onvifLayout->addLayout(labelLayout);
+    onvifLayout->addWidget(onvifView);
+
+    // onvifSection->setStyleSheet("border: 2px solid red;");
+
 }
 
-void MainWindow::setupVideoSection()
+void MainWindow::setupPiVideoSection()
 {
     QLabel *streamingLabel = new QLabel("Video Streaming");
     streamingLabel->setStyleSheet("font-weight: bold; color: orange;");
@@ -122,38 +134,49 @@ void MainWindow::setupVideoSection()
     cameraListButton = new QPushButton("카메라 리스트");
     connect(cameraListButton, &QPushButton::clicked, this, &MainWindow::onCameraListClicked);
 
-    QHBoxLayout *streamingHeaderLayout = new QHBoxLayout();
+    streamingHeaderLayout = new QHBoxLayout();
+    streamingHeaderLayout->setContentsMargins(0, 0, 0, 0);  // ✅ 좌우 여백 제거
+    streamingHeaderLayout->setSpacing(5);                  // ✅ 라벨-버튼 간격 줄임
     streamingHeaderLayout->addWidget(streamingLabel);
     streamingHeaderLayout->addStretch();
     streamingHeaderLayout->addWidget(cameraListButton);
 
-    // ✅ 기존 카메라 영상 그리드
     videoArea = new QWidget();
     videoGridLayout = new QGridLayout(videoArea);
-    videoGridLayout->setContentsMargins(0, 0, 0, 0);
-    videoGridLayout->setSpacing(1);
+    videoGridLayout->setContentsMargins(0, 0, 0, 0);         // ✅ 내부 여백 제거
+    videoGridLayout->setSpacing(3);                          // 영상 간격만 유지
     videoGridLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    // videoArea->setStyleSheet("border: 2px dotted green;");
 
     scrollArea = new QScrollArea();
     scrollArea->setWidgetResizable(true);
     scrollArea->setWidget(videoArea);
-    scrollArea->setFixedWidth(2 * 320 + 3);
+    scrollArea->setFixedWidth(2 * 320 + 20);  // scroll bar 고려 여유 포함
     scrollArea->setFrameStyle(QFrame::NoFrame);
+}
 
-    // ✅ 전체 비디오 레이아웃 구성
+
+// 전체 VideoSection 조립 (ONVIF + Pi 영상)
+void MainWindow::setupVideoSection()
+{
+    setupPiVideoSection();  // ✅ 내부적으로 Pi 영상 구성 먼저 수행
+
     QVBoxLayout *videoLayout = new QVBoxLayout();
-    videoLayout->addLayout(streamingHeaderLayout);
-    // videoLayout->addWidget(onvifFrame);   // 상단 고정
-    videoLayout->addWidget(scrollArea);   // 하단 카메라 영상들
+    videoLayout->addLayout(streamingHeaderLayout);  // 상단: "Video Streaming", 카메라 리스트 버튼
+    videoLayout->addWidget(onvifFrame);             // 중단: ONVIF 영상
+    videoLayout->addWidget(scrollArea);             // 하단: Pi 영상들
 
     videoSection = new QWidget();
     videoSection->setLayout(videoLayout);
     videoSection->setFixedWidth(640 + 20);
+    // videoSection->setStyleSheet("border: 2px solid red;");
+
 }
 
 void MainWindow::setupLogSection() {
     QLabel *alertLabel = new QLabel("Alert");
     alertLabel->setStyleSheet("font-weight: bold; color: orange;");
+    qDebug() << "Alert height:" << alertLabel->sizeHint().height();
 
     QPushButton *logHistoryButton = new QPushButton("전체 로그 보기");
     connect(logHistoryButton, &QPushButton::clicked, this, &MainWindow::onLogHistoryClicked);
@@ -180,6 +203,8 @@ void MainWindow::setupLogSection() {
     logSection = new QWidget();
     logSection->setLayout(logLayout);
     logSection->setMinimumWidth(320);
+    // logSection->setStyleSheet("border: 2px solid red;");
+
 }
 
 void MainWindow::setupFunctionPanel() {
@@ -314,86 +339,65 @@ void MainWindow::setupFunctionPanel() {
     functionSection = new QWidget();
     functionSection->setLayout(functionLayout);
     functionSection->setFixedWidth(200);
+    // functionSection->setStyleSheet("border: 2px solid red;");
+
 }
-/*
-void MainWindow::setupMainLayout() {
-    // 1. 전체 수직 레이아웃
-    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-
-    // 2. 상단 바 (Hello admin! 종료)
-    mainLayout->addLayout(topLayout);
-
-    // 3. 좌측 열: ONVIF + 일반 카메라 영상 (세로)
-    QVBoxLayout *leftColumn = new QVBoxLayout();
-    leftColumn->addWidget(onvifSection);
-    leftColumn->addWidget(videoSection);
-
-    // 4. 가운데 열: 로그 테이블
-    QVBoxLayout *middleColumn = new QVBoxLayout();
-    middleColumn->addWidget(logSection);
-
-    // 5. 오른쪽 열: 기능 체크박스
-    QVBoxLayout *rightColumn = new QVBoxLayout();
-    rightColumn->addWidget(functionSection);
-
-    // 6. 본문 3열 수평 배치
-    QHBoxLayout *bodyLayout = new QHBoxLayout();
-    bodyLayout->setSpacing(5);
-    bodyLayout->setContentsMargins(5, 0, 5, 0);
-    bodyLayout->addLayout(leftColumn);
-    bodyLayout->addLayout(middleColumn);
-    bodyLayout->addLayout(rightColumn);
-
-    // 7. 본문을 메인 수직 레이아웃에 추가
-    mainLayout->addLayout(bodyLayout);
-}
-*/
-
-
 
 void MainWindow::setupMainLayout() {
-    // 1. Top 영역 유지
-    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->addLayout(topLayout);
+    QVBoxLayout *mainWindowLayout = new QVBoxLayout(centralWidget);
+    mainWindowLayout->setContentsMargins(0, 10, 0, 0);
+    mainWindowLayout->setSpacing(10);  // Top ↔ Body 간격만 유지
 
-    // 2. 좌측 열: ONVIF + VIDEO (세로)
+    // Top Bar (Hello admin! + 종료 버튼)
+    mainWindowLayout->addLayout(topLayout);
+
+    // 좌측 열: ONVIF + Pi 영상
     QVBoxLayout *leftColumnLayout = new QVBoxLayout();
-    leftColumnLayout->setSpacing(5);
+    leftColumnLayout->setSpacing(0);
     leftColumnLayout->setContentsMargins(0, 0, 0, 0);
     leftColumnLayout->addWidget(onvifSection);
     leftColumnLayout->addWidget(videoSection);
+    leftColumnLayout->setAlignment(Qt::AlignTop);
 
-    // ✅ 고정 크기 QWidget으로 감싸기
     QWidget *leftColumnWidget = new QWidget();
     leftColumnWidget->setLayout(leftColumnLayout);
-    leftColumnWidget->setFixedWidth(640 + 60);  // ← 너비 고정
+    leftColumnWidget->setFixedWidth(640 + 20);
 
-    // 3. 중앙 열: 로그 테이블 (자동 크기)
+    // 중앙 열: 로그
     QVBoxLayout *middleColumnLayout = new QVBoxLayout();
     middleColumnLayout->setContentsMargins(0, 0, 0, 0);
+    middleColumnLayout->setSpacing(0);
     middleColumnLayout->addWidget(logSection);
+
     QWidget *middleColumnWidget = new QWidget();
     middleColumnWidget->setLayout(middleColumnLayout);
-    // → 너비 설정 X → 자동 조절
 
-    // 4. 우측 열: 기능 체크박스
+    // 우측 열: 기능 패널
     QVBoxLayout *rightColumnLayout = new QVBoxLayout();
     rightColumnLayout->setContentsMargins(0, 0, 0, 0);
+    rightColumnLayout->setSpacing(0);
     rightColumnLayout->addWidget(functionSection);
+
     QWidget *rightColumnWidget = new QWidget();
     rightColumnWidget->setLayout(rightColumnLayout);
-    rightColumnWidget->setFixedWidth(200);  // ← 너비 고정
+    rightColumnWidget->setFixedWidth(200);
 
-    // 5. 본문 3열 수평 배치
+    // 본문 3열
     QHBoxLayout *bodyLayout = new QHBoxLayout();
-    bodyLayout->setSpacing(5);
-    bodyLayout->setContentsMargins(5, 0, 5, 0);
-    bodyLayout->addWidget(leftColumnWidget);     // ✅ 고정 640px
-    bodyLayout->addWidget(middleColumnWidget);   // ✅ 자동 너비
-    bodyLayout->addWidget(rightColumnWidget);    // ✅ 고정 200px
+    bodyLayout->setSpacing(0);
+    bodyLayout->setContentsMargins(0, 0, 0, 0);
+    bodyLayout->setAlignment(Qt::AlignTop);
+    bodyLayout->addWidget(leftColumnWidget);
+    bodyLayout->addWidget(middleColumnWidget);
+    bodyLayout->addWidget(rightColumnWidget);
 
-    mainLayout->addLayout(bodyLayout);
+    // leftColumnWidget->setStyleSheet("border: 2px dashed orange;");
+    // middleColumnWidget->setStyleSheet("border: 2px dashed orange;");
+    // rightColumnWidget->setStyleSheet("border: 2px dashed orange;");
 
+
+    // 전체 적용
+    mainWindowLayout->addLayout(bodyLayout);
 }
 
 void MainWindow::refreshVideoGrid()

@@ -65,6 +65,7 @@ private slots:
 private:
     void setupUI();
     void setupTopBar();
+    void setupPiVideoSection();
     void setupVideoSection();
     void setupLogSection();
     void setupFunctionPanel();
@@ -82,6 +83,7 @@ private:
     QWidget *videoSection;
     QWidget *logSection;
     QWidget *functionSection;
+    QHBoxLayout *streamingHeaderLayout;  // setupPiVideoSection에서 구성 후 공유
 
     void setupWebSocketConnections();
     void onSocketConnected();
