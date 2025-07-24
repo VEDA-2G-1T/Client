@@ -62,10 +62,11 @@ MainWindow::~MainWindow() {}
 
 void MainWindow::setupUI() {
     centralWidget = new QWidget(this);
+
     setCentralWidget(centralWidget);
 
-    setupVideoSection();
     setupTopBar();
+    setupOnvifSection();
     setupVideoSection();
     setupLogSection();
     setupFunctionPanel();
@@ -87,7 +88,34 @@ void MainWindow::setupTopBar() {
     topLayout->addWidget(exitButton);
 }
 
-void MainWindow::setupVideoSection() {
+void MainWindow::setupOnvifSection()
+{
+    onvifPlayer = new QMediaPlayer(this);
+    onvifVideoItem = new QGraphicsVideoItem();
+    onvifVideoItem->setSize(QSizeF(640, 360));
+
+    onvifScene = new QGraphicsScene(this);
+    onvifScene->addItem(onvifVideoItem);
+
+    onvifView = new QGraphicsView(onvifScene);
+    onvifView->setFixedSize(640, 360);
+    onvifView->setStyleSheet("background-color: black; border: none;");
+
+    onvifPlayer->setVideoOutput(onvifVideoItem);
+    onvifPlayer->setSource(QUrl("rtsp://192.168.0.35:554/0/onvif/profile2/media.smp"));
+    onvifPlayer->play();
+
+    onvifSection = new QWidget();
+    QVBoxLayout *layout = new QVBoxLayout(onvifSection);
+    QLabel *label = new QLabel("ONVIF Camera Stream");
+    label->setStyleSheet("font-weight: bold; color: orange;");
+    layout->addWidget(label);
+    layout->addWidget(onvifView);
+    layout->addStretch();
+}
+
+void MainWindow::setupVideoSection()
+{
     QLabel *streamingLabel = new QLabel("Video Streaming");
     streamingLabel->setStyleSheet("font-weight: bold; color: orange;");
 
@@ -99,6 +127,7 @@ void MainWindow::setupVideoSection() {
     streamingHeaderLayout->addStretch();
     streamingHeaderLayout->addWidget(cameraListButton);
 
+    // ✅ 기존 카메라 영상 그리드
     videoArea = new QWidget();
     videoGridLayout = new QGridLayout(videoArea);
     videoGridLayout->setContentsMargins(0, 0, 0, 0);
@@ -111,9 +140,11 @@ void MainWindow::setupVideoSection() {
     scrollArea->setFixedWidth(2 * 320 + 3);
     scrollArea->setFrameStyle(QFrame::NoFrame);
 
+    // ✅ 전체 비디오 레이아웃 구성
     QVBoxLayout *videoLayout = new QVBoxLayout();
     videoLayout->addLayout(streamingHeaderLayout);
-    videoLayout->addWidget(scrollArea);
+    // videoLayout->addWidget(onvifFrame);   // 상단 고정
+    videoLayout->addWidget(scrollArea);   // 하단 카메라 영상들
 
     videoSection = new QWidget();
     videoSection->setLayout(videoLayout);
@@ -171,170 +202,97 @@ void MainWindow::setupFunctionPanel() {
     nightIntrusionCheckBox = new QCheckBox("Night Intrusion");
     fallDetectionCheckBox = new QCheckBox("Fall Detection");
 
-
-    // Raw 체크박스
+    // ✅ Raw 체크박스
     connect(rawCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
-        // Raw는 해제되지 않도록 강제 복원
-        if (!checked) {
-            rawCheckBox->blockSignals(true);
-            rawCheckBox->setChecked(true);
-            rawCheckBox->blockSignals(false);
-            return;
+        if (checked) {
+            blurCheckBox->blockSignals(true); blurCheckBox->setChecked(false); blurCheckBox->blockSignals(false);
+            ppeDetectorCheckBox->blockSignals(true); ppeDetectorCheckBox->setChecked(false); ppeDetectorCheckBox->blockSignals(false);
+            nightIntrusionCheckBox->blockSignals(true); nightIntrusionCheckBox->setChecked(false); nightIntrusionCheckBox->blockSignals(false);
+            fallDetectionCheckBox->blockSignals(true); fallDetectionCheckBox->setChecked(false); fallDetectionCheckBox->blockSignals(false);
+
+            for (const CameraInfo &camera : cameraList)
+                sendModeChangeRequest("raw", camera);
+            switchStreamForAllPlayers("processed");
+            addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
         }
-
-        // 나머지 모드는 해제하고 Raw 적용
-        blurCheckBox->blockSignals(true);
-        ppeDetectorCheckBox->blockSignals(true);
-        blurCheckBox->setChecked(false);
-        ppeDetectorCheckBox->setChecked(false);
-        blurCheckBox->blockSignals(false);
-        ppeDetectorCheckBox->blockSignals(false);
-
-        for (const CameraInfo &camera : cameraList)
-            sendModeChangeRequest("raw", camera);
-
-        // switchStreamForAllPlayers("raw");
-        switchStreamForAllPlayers("processed");
-        addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
     });
 
-    // Blur 체크박스
+    // ✅ Blur 체크박스
     connect(blurCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
         if (checked) {
-            rawCheckBox->blockSignals(true);
-            ppeDetectorCheckBox->blockSignals(true);
-            rawCheckBox->setChecked(false);
-            ppeDetectorCheckBox->setChecked(false);
-            rawCheckBox->blockSignals(false);
-            ppeDetectorCheckBox->blockSignals(false);
+            rawCheckBox->blockSignals(true); rawCheckBox->setChecked(false); rawCheckBox->blockSignals(false);
+            ppeDetectorCheckBox->blockSignals(true); ppeDetectorCheckBox->setChecked(false); ppeDetectorCheckBox->blockSignals(false);
+            nightIntrusionCheckBox->blockSignals(true); nightIntrusionCheckBox->setChecked(false); nightIntrusionCheckBox->blockSignals(false);
+            fallDetectionCheckBox->blockSignals(true); fallDetectionCheckBox->setChecked(false); fallDetectionCheckBox->blockSignals(false);
 
-            // 모든 카메라에 blur 모드 전송
             for (const CameraInfo &camera : cameraList)
                 sendModeChangeRequest("blur", camera);
-
             switchStreamForAllPlayers("processed");
             addLogEntry("System", "Blur", "Blur mode enabled", "", "", "");
         } else {
-            if (!rawCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
-                // 이미 Raw가 체크된 상태면 생략
-                if (!rawCheckBox->isChecked()) {
-                    rawCheckBox->blockSignals(true);
-                    rawCheckBox->setChecked(true);
-                    rawCheckBox->blockSignals(false);
-
-                    for (const CameraInfo &camera : cameraList)
-                        sendModeChangeRequest("raw", camera);
-
-                    switchStreamForAllPlayers("raw");
-                    addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
-                }
+            if (!rawCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()
+                && !nightIntrusionCheckBox->isChecked() && !fallDetectionCheckBox->isChecked()) {
+                rawCheckBox->setChecked(true);
             }
         }
     });
 
-    // PPE Detector 체크박스
+    // ✅ PPE Detector 체크박스
     connect(ppeDetectorCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
         if (checked) {
-            rawCheckBox->blockSignals(true);
-            blurCheckBox->blockSignals(true);
-            rawCheckBox->setChecked(false);
-            blurCheckBox->setChecked(false);
-            rawCheckBox->blockSignals(false);
-            blurCheckBox->blockSignals(false);
+            rawCheckBox->blockSignals(true); rawCheckBox->setChecked(false); rawCheckBox->blockSignals(false);
+            blurCheckBox->blockSignals(true); blurCheckBox->setChecked(false); blurCheckBox->blockSignals(false);
+            nightIntrusionCheckBox->blockSignals(true); nightIntrusionCheckBox->setChecked(false); nightIntrusionCheckBox->blockSignals(false);
+            fallDetectionCheckBox->blockSignals(true); fallDetectionCheckBox->setChecked(false); fallDetectionCheckBox->blockSignals(false);
 
-            // 모든 카메라에 detect 모드 전송
             for (const CameraInfo &camera : cameraList)
                 sendModeChangeRequest("detect", camera);
-
             switchStreamForAllPlayers("processed");
             addLogEntry("System", "PPE", "PPE Detector enabled", "", "", "");
         } else {
-            if (!rawCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
-                // 이미 Raw가 체크된 상태면 생략
-                if (!rawCheckBox->isChecked()) {
-                    rawCheckBox->blockSignals(true);
-                    rawCheckBox->setChecked(true);
-                    rawCheckBox->blockSignals(false);
-
-                    for (const CameraInfo &camera : cameraList)
-                        sendModeChangeRequest("raw", camera);
-
-                    switchStreamForAllPlayers("raw");
-                    addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
-                }
+            if (!rawCheckBox->isChecked() && !blurCheckBox->isChecked()
+                && !nightIntrusionCheckBox->isChecked() && !fallDetectionCheckBox->isChecked()) {
+                rawCheckBox->setChecked(true);
             }
         }
     });
 
-
-    // NightIntrusion 체크
+    // ✅ Night Intrusion 체크박스
     connect(nightIntrusionCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
         if (checked) {
-            rawCheckBox->blockSignals(true);
-            blurCheckBox->blockSignals(true);
-            ppeDetectorCheckBox->blockSignals(true);
-            rawCheckBox->setChecked(false);
-            blurCheckBox->setChecked(false);
-            ppeDetectorCheckBox->setChecked(false);
-            rawCheckBox->blockSignals(false);
-            blurCheckBox->blockSignals(false);
-            ppeDetectorCheckBox->blockSignals(false);
+            rawCheckBox->blockSignals(true); rawCheckBox->setChecked(false); rawCheckBox->blockSignals(false);
+            blurCheckBox->blockSignals(true); blurCheckBox->setChecked(false); blurCheckBox->blockSignals(false);
+            ppeDetectorCheckBox->blockSignals(true); ppeDetectorCheckBox->setChecked(false); ppeDetectorCheckBox->blockSignals(false);
+            fallDetectionCheckBox->blockSignals(true); fallDetectionCheckBox->setChecked(false); fallDetectionCheckBox->blockSignals(false);
 
             for (const CameraInfo &camera : cameraList)
-                sendModeChangeRequest("detect", camera);  // 동일하게 detect 모드
-
+                sendModeChangeRequest("trespass", camera);
             switchStreamForAllPlayers("processed");
             addLogEntry("System", "Night", "Night Intrusion enabled", "", "", "");
         } else {
-            if (!rawCheckBox->isChecked() && !blurCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
-                rawCheckBox->blockSignals(true);
+            if (!rawCheckBox->isChecked() && !blurCheckBox->isChecked()
+                && !ppeDetectorCheckBox->isChecked() && !fallDetectionCheckBox->isChecked()) {
                 rawCheckBox->setChecked(true);
-                rawCheckBox->blockSignals(false);
-                for (const CameraInfo &camera : cameraList)
-                    sendModeChangeRequest("raw", camera);
-                switchStreamForAllPlayers("raw");
-                addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
             }
         }
     });
 
-    // Fall 모드 체크
+    // ✅ Fall Detection 체크박스
     connect(fallDetectionCheckBox, &QCheckBox::toggled, this, [=](bool checked) {
         if (checked) {
-            // 다른 모드 해제
-            rawCheckBox->blockSignals(true);
-            blurCheckBox->blockSignals(true);
-            ppeDetectorCheckBox->blockSignals(true);
-            nightIntrusionCheckBox->blockSignals(true);
-
-            rawCheckBox->setChecked(false);
-            blurCheckBox->setChecked(false);
-            ppeDetectorCheckBox->setChecked(false);
-            nightIntrusionCheckBox->setChecked(false);
-
-            rawCheckBox->blockSignals(false);
-            blurCheckBox->blockSignals(false);
-            ppeDetectorCheckBox->blockSignals(false);
-            nightIntrusionCheckBox->blockSignals(false);
+            rawCheckBox->blockSignals(true); rawCheckBox->setChecked(false); rawCheckBox->blockSignals(false);
+            blurCheckBox->blockSignals(true); blurCheckBox->setChecked(false); blurCheckBox->blockSignals(false);
+            ppeDetectorCheckBox->blockSignals(true); ppeDetectorCheckBox->setChecked(false); ppeDetectorCheckBox->blockSignals(false);
+            nightIntrusionCheckBox->blockSignals(true); nightIntrusionCheckBox->setChecked(false); nightIntrusionCheckBox->blockSignals(false);
 
             for (const CameraInfo &camera : cameraList)
                 sendModeChangeRequest("fall", camera);
-
             switchStreamForAllPlayers("processed");
             addLogEntry("System", "Fall", "Fall Detection enabled", "", "", "");
         } else {
-            // 다른 모드도 비활성화되어 있으면 Raw 모드 자동 전환
             if (!rawCheckBox->isChecked() && !blurCheckBox->isChecked()
                 && !ppeDetectorCheckBox->isChecked() && !nightIntrusionCheckBox->isChecked()) {
-                rawCheckBox->blockSignals(true);
                 rawCheckBox->setChecked(true);
-                rawCheckBox->blockSignals(false);
-
-                for (const CameraInfo &camera : cameraList)
-                    sendModeChangeRequest("raw", camera);
-
-                switchStreamForAllPlayers("raw");
-                addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
             }
         }
     });
@@ -357,16 +315,85 @@ void MainWindow::setupFunctionPanel() {
     functionSection->setLayout(functionLayout);
     functionSection->setFixedWidth(200);
 }
+/*
+void MainWindow::setupMainLayout() {
+    // 1. 전체 수직 레이아웃
+    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+
+    // 2. 상단 바 (Hello admin! 종료)
+    mainLayout->addLayout(topLayout);
+
+    // 3. 좌측 열: ONVIF + 일반 카메라 영상 (세로)
+    QVBoxLayout *leftColumn = new QVBoxLayout();
+    leftColumn->addWidget(onvifSection);
+    leftColumn->addWidget(videoSection);
+
+    // 4. 가운데 열: 로그 테이블
+    QVBoxLayout *middleColumn = new QVBoxLayout();
+    middleColumn->addWidget(logSection);
+
+    // 5. 오른쪽 열: 기능 체크박스
+    QVBoxLayout *rightColumn = new QVBoxLayout();
+    rightColumn->addWidget(functionSection);
+
+    // 6. 본문 3열 수평 배치
+    QHBoxLayout *bodyLayout = new QHBoxLayout();
+    bodyLayout->setSpacing(5);
+    bodyLayout->setContentsMargins(5, 0, 5, 0);
+    bodyLayout->addLayout(leftColumn);
+    bodyLayout->addLayout(middleColumn);
+    bodyLayout->addLayout(rightColumn);
+
+    // 7. 본문을 메인 수직 레이아웃에 추가
+    mainLayout->addLayout(bodyLayout);
+}
+*/
+
+
 
 void MainWindow::setupMainLayout() {
-    QHBoxLayout *mainBodyLayout = new QHBoxLayout();
-    mainBodyLayout->addWidget(videoSection);
-    mainBodyLayout->addWidget(logSection);
-    mainBodyLayout->addWidget(functionSection);
-
+    // 1. Top 영역 유지
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
     mainLayout->addLayout(topLayout);
-    mainLayout->addLayout(mainBodyLayout);
+
+    // 2. 좌측 열: ONVIF + VIDEO (세로)
+    QVBoxLayout *leftColumnLayout = new QVBoxLayout();
+    leftColumnLayout->setSpacing(5);
+    leftColumnLayout->setContentsMargins(0, 0, 0, 0);
+    leftColumnLayout->addWidget(onvifSection);
+    leftColumnLayout->addWidget(videoSection);
+
+    // ✅ 고정 크기 QWidget으로 감싸기
+    QWidget *leftColumnWidget = new QWidget();
+    leftColumnWidget->setLayout(leftColumnLayout);
+    leftColumnWidget->setFixedWidth(640 + 60);  // ← 너비 고정
+
+    // 3. 중앙 열: 로그 테이블 (자동 크기)
+    QVBoxLayout *middleColumnLayout = new QVBoxLayout();
+    middleColumnLayout->setContentsMargins(0, 0, 0, 0);
+    middleColumnLayout->addWidget(logSection);
+    QWidget *middleColumnWidget = new QWidget();
+    middleColumnWidget->setLayout(middleColumnLayout);
+    // → 너비 설정 X → 자동 조절
+
+    // 4. 우측 열: 기능 체크박스
+    QVBoxLayout *rightColumnLayout = new QVBoxLayout();
+    rightColumnLayout->setContentsMargins(0, 0, 0, 0);
+    rightColumnLayout->addWidget(functionSection);
+    QWidget *rightColumnWidget = new QWidget();
+    rightColumnWidget->setLayout(rightColumnLayout);
+    rightColumnWidget->setFixedWidth(200);  // ← 너비 고정
+
+    // 5. 본문 3열 수평 배치
+    QHBoxLayout *bodyLayout = new QHBoxLayout();
+    bodyLayout->setSpacing(5);
+    bodyLayout->setContentsMargins(5, 0, 5, 0);
+    bodyLayout->addWidget(leftColumnWidget);     // ✅ 고정 640px
+    bodyLayout->addWidget(middleColumnWidget);   // ✅ 자동 너비
+    bodyLayout->addWidget(rightColumnWidget);    // ✅ 고정 200px
+
+    mainLayout->addLayout(bodyLayout);
+
 }
 
 void MainWindow::refreshVideoGrid()
@@ -382,49 +409,84 @@ void MainWindow::refreshVideoGrid()
     int rows = (total + 1) / 2;
     videoArea->setMinimumSize(columns * 320, rows * 240);
 
-    // 현재 체크박스 상태 기준으로 스트림 suffix 결정
-    // QString streamSuffix = "raw";
+    // ✅ 스트림 suffix는 항상 processed 고정
     QString streamSuffix = "processed";
-    if (blurCheckBox->isChecked() || ppeDetectorCheckBox->isChecked()) {
-        streamSuffix = "processed";
-    }
 
-    // 스트리밍 구성은 VideoPlayerManager에게 위임
-    videoPlayerManager->setupVideoGrid(videoGridLayout, cameraList, streamSuffix);
+    // ✅ 아무 모드도 체크되지 않은 경우 → raw 모드 적용 및 서버에 먼저 전송
+    bool isRawMode = false;
+    if (!cameraList.isEmpty()
+        && !rawCheckBox->isChecked()
+        && !blurCheckBox->isChecked()
+        && !ppeDetectorCheckBox->isChecked()
+        && !nightIntrusionCheckBox->isChecked()
+        && !fallDetectionCheckBox->isChecked()) {
 
-    // 모든 카메라가 삭제된 경우: 체크박스 초기화
-    if (cameraList.isEmpty()) {
-        rawCheckBox->blockSignals(true);
-        blurCheckBox->blockSignals(true);
-        ppeDetectorCheckBox->blockSignals(true);
-
-        rawCheckBox->setChecked(false);
-        blurCheckBox->setChecked(false);
-        ppeDetectorCheckBox->setChecked(false);
-
-        rawCheckBox->blockSignals(false);
-        blurCheckBox->blockSignals(false);
-        ppeDetectorCheckBox->blockSignals(false);
-    }
-
-    // 카메라가 있고 아무 모드도 선택 안되어 있을 경우 → Raw 적용
-    if (!cameraList.isEmpty() && !blurCheckBox->isChecked() && !ppeDetectorCheckBox->isChecked()) {
         rawCheckBox->blockSignals(true);
         rawCheckBox->setChecked(true);
         rawCheckBox->blockSignals(false);
 
         for (const CameraInfo &camera : cameraList)
-            sendModeChangeRequest("raw", camera);
+            sendModeChangeRequest("raw", camera);  // ✅ 먼저 서버에 raw 모드 요청
 
-        // switchStreamForAllPlayers("raw");
-        switchStreamForAllPlayers("processed");
+        isRawMode = true;
+    }
 
+    // ✅ 스트리밍 구성: 항상 processed 스트림 사용
+    videoPlayerManager->setupVideoGrid(videoGridLayout, cameraList, streamSuffix);
+
+    // ✅ 카메라 리스트가 비어 있으면 체크박스 초기화
+    if (cameraList.isEmpty()) {
+        rawCheckBox->blockSignals(true);
+        blurCheckBox->blockSignals(true);
+        ppeDetectorCheckBox->blockSignals(true);
+        nightIntrusionCheckBox->blockSignals(true);
+        fallDetectionCheckBox->blockSignals(true);
+
+        rawCheckBox->setChecked(false);
+        blurCheckBox->setChecked(false);
+        ppeDetectorCheckBox->setChecked(false);
+        nightIntrusionCheckBox->setChecked(false);
+        fallDetectionCheckBox->setChecked(false);
+
+        rawCheckBox->blockSignals(false);
+        blurCheckBox->blockSignals(false);
+        ppeDetectorCheckBox->blockSignals(false);
+        nightIntrusionCheckBox->blockSignals(false);
+        fallDetectionCheckBox->blockSignals(false);
+    }
+
+    // ✅ 로그 출력은 실제 적용 이후로
+    if (isRawMode) {
         addLogEntry("System", "Raw", "Raw mode enabled", "", "", "");
     }
 
     setupWebSocketConnections();
-    loadInitialLogs();  // 카메라 재정렬 이후 초기 로그 불러오기
-    performHealthCheck();
+    loadInitialLogs();       // 초기 로그 불러오기
+    performHealthCheck();    // 상태 체크
+
+    if (onvifFrame) {
+        onvifFrame->show();
+        onvifFrame->raise();
+    }
+
+    if (onvifPlayer && onvifPlayer->playbackState() != QMediaPlayer::PlayingState) {
+        onvifPlayer->play();
+        qDebug() << "[ONVIF] 강제 재생 재요청됨";
+    }
+
+    QTimer::singleShot(200, this, [this]() {
+        if (onvifFrame) {
+            onvifFrame->show();
+            onvifFrame->raise();  // 혹시 다른 것에 가려졌다면
+        }
+
+        onvifPlayer = new QMediaPlayer(this);
+        onvifPlayer->setVideoOutput(onvifVideo);  // 기존 video 위젯 유지
+        onvifPlayer->setSource(QUrl("rtsp://192.168.0.35:554/0/onvif/profile2/media.smp"));
+        onvifPlayer->play();
+
+        qDebug() << "[ONVIF] 완전 새로 생성 후 재생됨";
+    });
 }
 
 void MainWindow::switchStreamForAllPlayers(const QString &suffix)
@@ -480,52 +542,6 @@ void MainWindow::onLogHistoryClicked()
     LogHistoryDialog dialog(this, &fullLogEntries);  // 로그 목록 전달
     dialog.exec();
 }
-/*
-void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &camera)
-{
-    if (camera.ip.isEmpty() || camera.port.isEmpty()) {
-        qWarning() << "[모드 변경] 카메라 IP 또는 포트 정보 없음 →" << camera.name;
-        return;
-    }
-
-    QString apiUrl = QString("https://%1:8443/api/mode").arg(camera.ip);
-    QUrl url(apiUrl);
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-
-    QJsonObject json;
-    json["mode"] = mode;
-    QJsonDocument doc(json);
-    QByteArray data = doc.toJson();
-
-    QNetworkReply *reply = networkManager->post(request, data);
-    reply->ignoreSslErrors();
-
-    connect(reply, &QNetworkReply::finished, this, [=]() {
-        reply->deleteLater();
-
-        if (reply->error() == QNetworkReply::NoError) {
-            QJsonDocument responseDoc = QJsonDocument::fromJson(reply->readAll());
-            if (!responseDoc.isObject()) {
-                qWarning() << "[모드 변경] 응답 JSON 파싱 실패 →" << camera.name;
-                return;
-            }
-
-            QJsonObject obj = responseDoc.object();
-            QString status = obj["status"].toString();
-            QString message = obj["message"].toString();
-
-            if (status != "success") {
-                qWarning() << "[모드 변경 실패]" << camera.name << ":" << message;
-            } else {
-                qDebug() << "[모드 변경 성공]" << camera.name << "→" << mode;
-            }
-        } else {
-            qWarning() << "[모드 변경 네트워크 오류]" << camera.name << ":" << reply->errorString();
-        }
-    });
-}
-*/
 
 void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &camera)
 {
@@ -577,7 +593,6 @@ void MainWindow::sendModeChangeRequest(const QString &mode, const CameraInfo &ca
         }
     });
 }
-
 
 void MainWindow::onAlertItemClicked(int row, int column)
 {
@@ -730,15 +745,6 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         QString details = QString("👷 %1명 | ⛑️ %2명 | 🦺 %3명 | 신뢰도: %4")
                               .arg(person).arg(helmet).arg(vest).arg(conf, 0, 'f', 2);
 
-        // ✅ Night Intrusion 모드인지 확인
-        if (nightIntrusionCheckBox && nightIntrusionCheckBox->isChecked()) {
-            event = QString("🌙 야간 무단 침입 감지 (%1명)").arg(person);
-
-            qDebug() << "[야간 침입 이벤트]" << event << "IP:" << camera.ip;
-            addLogEntry(camera.name, "Night", event, imagePath, details, camera.ip);
-            return;  // 여기서 PPE 처리를 생략하고 return
-        }
-
         // ✅ 기존 PPE 감지 처리
         if (helmet < person && vest >= person)
             event = "⛑️ 헬멧 미착용 감지";
@@ -799,6 +805,18 @@ void MainWindow::onSocketMessageReceived(const QString &message)
         addLogEntry(camera.name, "PPE", event, imagePath, details, camera.ip);
     }
 
+    else if (type == "new_trespass") {
+        QString ts = data["timestamp"].toString();
+        int count = data["count"].toInt();
+
+        if (count > 0) {
+            QString event = QString("🌙 야간 침입 감지 (%1명)").arg(count);
+            QString details = QString("감지 시각: %1 | 침입자 수: %2").arg(ts).arg(count);
+
+            addLogEntry(camera.name, "Night", event, "", details, camera.ip);
+        }
+    }
+
     else if (type == "new_blur") {
         QString ts = data["timestamp"].toString();
         QString key = camera.name + "_" + ts;
@@ -831,6 +849,28 @@ void MainWindow::onSocketMessageReceived(const QString &message)
 
         lastAnomalyStatus[camera.name] = status;
     }
+    else if (type == "new_fall") {
+        QString ts = data["timestamp"].toString();
+        int count = data["count"].toInt();
+
+        if (count > 0) {
+            QString event = "🚨 낙상 감지";
+            QString details = QString("낙상 감지 시각: %1").arg(ts);
+
+            addLogEntry(camera.name, "Fall", event, "", details, camera.ip);
+
+            /*
+            // (선택) 팝업 알림도 추가 가능
+            QMessageBox *popup = new QMessageBox(this);
+            popup->setIcon(QMessageBox::Warning);
+            popup->setWindowTitle("낙상 감지");
+            popup->setText(QString("%1 카메라에서 낙상이 감지되었습니다!\n시각: %2").arg(camera.name, ts));
+            popup->setStandardButtons(QMessageBox::Ok);
+            popup->setModal(false);
+            popup->show();
+            */
+        }
+    }
     else if (type == "stm_status_update") {
         qDebug() << "[STM 상태 응답 수신]" << data;
         double temp = data["temperature"].toDouble();
@@ -846,6 +886,18 @@ void MainWindow::onSocketMessageReceived(const QString &message)
 
         healthCheckResponded.insert(camera.ip);  // ✅ 응답 확인 기록
         addLogEntry(camera.name, "Health", "✅ 상태 수신", "", details, camera.ip);
+    }
+    else if (type == "mode_change_ack") {
+        QString status = obj["status"].toString();
+        QString mode = obj["mode"].toString();
+        QString message = obj["message"].toString();
+
+        if (status == "error") {
+            qWarning() << "[모드 변경 실패]" << message;
+            QMessageBox::warning(this, "모드 변경 실패", message);
+        } else {
+            qDebug() << "[모드 변경 성공 응답]" << mode;
+        }
     }
     else {
         qWarning() << "[WebSocket] 알 수 없는 타입 수신:" << type;
@@ -948,3 +1000,5 @@ void MainWindow::performHealthCheck()
         }
     }
 }
+
+

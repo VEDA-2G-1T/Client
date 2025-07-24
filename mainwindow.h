@@ -20,6 +20,9 @@
 #include <QSet>  // 이 줄 추가!
 #include <QWebSocket>
 #include <QMap>
+#include <QGraphicsView>
+#include <QGraphicsScene>
+#include <QGraphicsVideoItem>
 
 class CameraListDialog;
 
@@ -46,6 +49,7 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+    void setupOnvifSection();
     void refreshVideoGrid();
     QSet<QString> recentBlurLogKeys;  // 중복 Blur 로그 방지용 키
 
@@ -74,6 +78,7 @@ private:
     void loadInitialLogs();
 
     QHBoxLayout *topLayout;
+    QWidget *onvifSection;  // onvifSection 위젯
     QWidget *videoSection;
     QWidget *logSection;
     QWidget *functionSection;
@@ -96,6 +101,10 @@ private:
     QVector<QVideoWidget*> videoWidgets;
     QVector<LogEntry> fullLogEntries;
     QMap<QString, QString> lastAnomalyStatus;
+
+    QMediaPlayer* onvifPlayer = nullptr;
+    QVideoWidget* onvifVideo = nullptr;
+    QWidget* onvifFrame = nullptr;
 
     QWidget *centralWidget;
     QWidget *videoArea;
@@ -120,6 +129,10 @@ private:
     QNetworkAccessManager *networkManager;
 
     QMap<QString, QWebSocket*> socketMap;  // IP → QWebSocket*
+
+    QGraphicsView *onvifView;
+    QGraphicsScene *onvifScene;
+    QGraphicsVideoItem *onvifVideoItem;
 };
 
 #endif // MAINWINDOW_H
